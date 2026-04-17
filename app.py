@@ -40,352 +40,241 @@ st.set_page_config(
 st.markdown(
     """
 <style>
-    /* ═══ 全局字体 ═══ */
+    :root {
+        --bg: #0a0e17;
+        --panel: #0d1520;
+        --panel-strong: #0d2137;
+        --line: #1a3a5c;
+        --line-strong: #1a5276;
+        --accent: #4fc3f7;
+        --accent-soft: #80d0f8;
+        --text: #c0d8f0;
+        --muted: #6d93b2;
+        --ok: #66bb6a;
+        --warn: #ffb74d;
+    }
     html, body, [class*="css"] {
         font-family: "Menlo", "Consolas", "SF Mono", "Monaco", monospace;
-        color: #c0d8f0;
+        color: var(--text);
     }
-    /* ═══ 主背景 & 文字 ═══ */
-    .stApp, .main .block-container {
-        background-color: #0a0e17;
+    .stApp {
+        background: radial-gradient(circle at 100% -5%, #113052 0%, var(--bg) 35%);
     }
-    /* ═══ 标题区域 ═══ */
+    .main .block-container {
+        max-width: 1400px;
+        padding-top: 1.1rem;
+        padding-bottom: 1.2rem;
+    }
     .main-header {
         text-align: center;
-        padding: 1.2rem 0 0.5rem 0;
-        border-bottom: 1px solid #1a3a5c;
+        padding: 0.8rem 0 0.4rem 0;
+        border-bottom: 1px solid var(--line);
         margin-bottom: 0.8rem;
     }
     .main-header h1 {
-        color: #4fc3f7;
-        font-size: 1.8rem;
-        font-weight: 700;
+        color: var(--accent);
+        margin: 0;
         letter-spacing: 2px;
-        margin-bottom: 0;
-        text-shadow: 0 0 20px rgba(79,195,247,0.3);
+        font-size: 1.75rem;
+        font-weight: 700;
     }
     .main-header p {
-        color: #6090b0;
+        color: var(--muted);
+        margin: 0.2rem 0 0 0;
         font-size: 0.8rem;
-        margin-top: 0.3rem;
         letter-spacing: 1px;
     }
-    /* ═══ 信息卡片 — 深蓝科幻风 ═══ */
-    .info-box {
-        background: #0d2137;
-        border-left: 3px solid #4fc3f7;
-        padding: 12px 16px;
-        border-radius: 4px;
-        margin: 8px 0;
-        font-size: 0.85rem;
-        color: #c0d8f0;
+    .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 0.85rem 1rem;
+        margin: 0.35rem 0;
+    }
+    .panel-title {
+        color: var(--accent);
+        font-weight: 700;
+        margin-bottom: 0.4rem;
+        letter-spacing: 0.4px;
+    }
+    .quick-guide {
+        color: var(--text);
+        line-height: 1.65;
+        font-size: 0.84rem;
+        white-space: pre-line;
+    }
+    .status-strip {
+        margin-top: 0.4rem;
+        color: var(--muted);
+        font-size: 0.76rem;
+        border-top: 1px dashed var(--line);
+        padding-top: 0.35rem;
+    }
+    .info-box, .warn-box, .ok-box {
+        border-radius: 5px;
+        padding: 0.7rem 0.9rem;
+        margin: 0.35rem 0;
+        border-left: 3px solid var(--accent);
+        background: var(--panel-strong);
+        font-size: 0.84rem;
     }
     .warn-box {
-        background: #1a1a0d;
-        border-left: 3px solid #ffb74d;
-        padding: 12px 16px;
-        border-radius: 4px;
-        margin: 8px 0;
-        font-size: 0.85rem;
+        border-left-color: var(--warn);
         color: #e0c890;
+        background: #1b1a10;
     }
     .ok-box {
-        background: #0d1f14;
-        border-left: 3px solid #66bb6a;
-        padding: 12px 16px;
-        border-radius: 4px;
-        margin: 8px 0;
-        font-size: 0.85rem;
-        color: #a0d8b0;
+        border-left-color: var(--ok);
+        color: #aadab0;
+        background: #0f1f17;
     }
-    /* ═══ 步骤指示 ═══ */
     .step-num {
         display: inline-block;
-        background: #4fc3f7;
-        color: #0a0e17;
-        width: 28px;
-        height: 28px;
-        border-radius: 50%;
+        background: var(--accent);
+        color: var(--bg);
+        width: 26px;
+        height: 26px;
+        border-radius: 999px;
         text-align: center;
-        line-height: 28px;
-        font-weight: bold;
+        line-height: 26px;
+        font-weight: 700;
         margin-right: 8px;
     }
-    /* ═══ 侧边栏 ═══ */
-    section[data-testid="stSidebar"] > div {
-        background-color: #0d1520;
-        padding-top: 1rem;
-    }
     section[data-testid="stSidebar"] {
-        background-color: #0d1520;
-        border-right: 1px solid #1a3a5c;
+        border-right: 1px solid var(--line);
     }
-    /* ═══ 下载按钮 ═══ */
+    section[data-testid="stSidebar"] > div {
+        background: var(--panel);
+    }
+    .stButton > button,
     .stDownloadButton > button {
-        width: 100%;
-        background-color: #0d2137 !important;
-        color: #4fc3f7 !important;
-        border: 1px solid #1a5276 !important;
-        font-family: "Menlo", "Consolas", monospace !important;
+        background: var(--panel-strong) !important;
+        color: var(--accent) !important;
+        border: 1px solid var(--line-strong) !important;
+        border-radius: 4px !important;
+        min-height: 2.2rem;
     }
+    .stButton > button:hover,
     .stDownloadButton > button:hover {
-        background-color: #153d5e !important;
-        border-color: #4fc3f7 !important;
+        border-color: var(--accent) !important;
+        background: #153d5e !important;
     }
-    /* ═══ 普通按钮 ═══ */
-    .stButton > button {
-        background-color: #0d2137 !important;
-        color: #4fc3f7 !important;
-        border: 1px solid #1a5276 !important;
-        border-radius: 4px;
-        font-family: "Menlo", "Consolas", monospace !important;
-        transition: all 0.2s;
-    }
-    .stButton > button:hover {
-        background-color: #153d5e !important;
-        border-color: #4fc3f7 !important;
-    }
-    .stButton > button[kind="primary"],
     button[data-testid="stBaseButton-primary"] {
-        background-color: #1a5276 !important;
-        color: #4fc3f7 !important;
-        border: 1px solid #4fc3f7 !important;
+        background: #1a5276 !important;
+        border-color: var(--accent) !important;
     }
-    button[data-testid="stBaseButton-primary"]:hover {
-        background-color: #2a6a96 !important;
-    }
-    /* ═══ Tabs ═══ */
     .stTabs [data-baseweb="tab-list"] {
-        background-color: #0a1520;
-        border-bottom: 1px solid #1a3a5c;
-        gap: 0;
+        background: transparent;
+        border-bottom: 1px solid var(--line);
     }
     .stTabs [data-baseweb="tab"] {
-        background-color: #0a1520;
-        color: #6090b0;
-        border: none;
-        padding: 10px 20px;
-        font-family: "Menlo", "Consolas", monospace;
-        font-size: 0.85rem;
+        color: var(--muted);
+        border: 1px solid transparent;
+        border-bottom: none;
+        border-radius: 6px 6px 0 0;
+        padding: 0.5rem 1rem;
     }
     .stTabs [data-baseweb="tab"]:hover {
-        background-color: #122a42;
-        color: #80d0f8;
+        color: var(--accent-soft);
+        background: #122a42;
     }
     .stTabs [aria-selected="true"] {
-        background-color: #0d2137 !important;
-        color: #4fc3f7 !important;
-        border-bottom: 2px solid #4fc3f7 !important;
+        color: var(--accent) !important;
+        background: var(--panel-strong) !important;
+        border-color: var(--line) !important;
+        border-bottom: 2px solid var(--accent) !important;
     }
     .stTabs [data-baseweb="tab-panel"] {
-        background-color: #0d1520;
-        border: 1px solid #1a3a5c;
+        background: var(--panel);
+        border: 1px solid var(--line);
         border-top: none;
-        padding: 1.2rem;
         border-radius: 0 0 6px 6px;
+        padding: 1rem;
     }
-    /* ═══ Metric 卡片 ═══ */
     [data-testid="stMetric"] {
-        background-color: #0d2137;
-        border: 1px solid #1a3a5c;
-        padding: 12px 16px;
+        background: var(--panel-strong);
+        border: 1px solid var(--line);
         border-radius: 6px;
+        padding: 0.65rem 0.8rem;
     }
     [data-testid="stMetricLabel"] {
-        color: #6090b0 !important;
-        font-size: 0.8rem;
+        color: var(--muted) !important;
     }
     [data-testid="stMetricValue"] {
-        color: #4fc3f7 !important;
-        font-weight: 700;
-    }
-    /* ═══ Expander ═══ */
-    .streamlit-expanderHeader {
-        background-color: #0d2137 !important;
-        color: #4fc3f7 !important;
-        border: 1px solid #1a3a5c;
-        border-radius: 4px;
+        color: var(--accent) !important;
     }
     details {
-        border: 1px solid #1a3a5c !important;
+        border: 1px solid var(--line) !important;
         border-radius: 6px !important;
-        background-color: #0d1520 !important;
+        background: var(--panel) !important;
     }
     details summary {
-        background-color: #0d2137 !important;
-        color: #4fc3f7 !important;
+        background: var(--panel-strong) !important;
+        color: var(--accent) !important;
+        border-radius: 6px 6px 0 0;
     }
-    /* ═══ DataFrame / 表格 ═══ */
-    [data-testid="stDataFrame"],
-    .stDataFrame {
-        border: 1px solid #1a3a5c;
-        border-radius: 4px;
-    }
-    /* ═══ 输入框 ═══ */
     .stSelectbox > div > div,
     .stNumberInput > div > div > input,
-    .stTextInput > div > div > input {
-        background-color: #0d1a28 !important;
-        border-color: #1a3a5c !important;
-        color: #c0d8f0 !important;
+    .stTextInput > div > div > input,
+    .stTextArea textarea {
+        background: #0d1a28 !important;
+        color: var(--text) !important;
+        border-color: var(--line) !important;
     }
     .stSelectbox > div > div:focus-within,
-    .stNumberInput > div > div > input:focus {
-        border-color: #4fc3f7 !important;
+    .stNumberInput > div > div > input:focus,
+    .stTextInput > div > div > input:focus,
+    .stTextArea textarea:focus {
+        border-color: var(--accent) !important;
     }
-    /* ═══ 文件上传 ═══ */
     [data-testid="stFileUploader"] {
-        border: 1px dashed #1a5276;
+        border: 1px dashed var(--line-strong);
         border-radius: 6px;
-        padding: 8px;
-        background-color: #0d1a28;
+        background: #0d1a28;
     }
     [data-testid="stFileUploader"]:hover {
-        border-color: #4fc3f7;
+        border-color: var(--accent);
     }
-    /* ═══ HR/分隔线 ═══ */
-    hr {
-        border-color: #1a3a5c !important;
+    [data-testid="stDataFrame"] {
+        border: 1px solid var(--line);
+        border-radius: 4px;
     }
-    /* ═══ 链接 ═══ */
-    a {
-        color: #4fc3f7 !important;
-    }
-    a:hover {
-        color: #80d0f8 !important;
-    }
-    /* ═══ 代码块 ═══ */
-    code, .stCodeBlock {
-        background-color: #0a1018 !important;
-        color: #80b8d8 !important;
-    }
-    /* ═══ 滚动条 ═══ */
-    ::-webkit-scrollbar {
-        width: 10px;
-        height: 10px;
-    }
-    ::-webkit-scrollbar-track {
-        background: #0a1018;
-    }
-    ::-webkit-scrollbar-thumb {
-        background: #1a3a5c;
-        border-radius: 5px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-        background: #2a5a8c;
-    }
-    /* ═══ 成功/警告/错误提示 ═══ */
     .stAlert > div[data-baseweb="notification"] {
-        background-color: #0d1a28 !important;
-        border: 1px solid #1a3a5c !important;
+        background: #0d1a28 !important;
+        border: 1px solid var(--line) !important;
     }
-    /* ═══ Caption ═══ */
-    .stCaption, small {
-        color: #4a7090 !important;
-    }
-    /* ═══ Markdown 标题 ═══ */
     h1, h2, h3, h4, h5, h6 {
-        color: #4fc3f7 !important;
-        font-family: "Menlo", "Consolas", monospace !important;
+        color: var(--accent) !important;
     }
     h3 {
-        border-bottom: 1px solid #1a3a5c;
-        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 0.35rem;
+        margin-bottom: 0.7rem;
     }
-    /* ═══ 表格内文字 ═══ */
-    .stMarkdown table {
-        border-collapse: collapse;
+    .stCaption, small {
+        color: #4e7493 !important;
     }
-    .stMarkdown table th {
-        background-color: #0d2137 !important;
-        color: #4fc3f7 !important;
-        border: 1px solid #1a3a5c !important;
-        padding: 8px 12px;
-        font-weight: 700;
+    code, .stCodeBlock {
+        background: #0a1018 !important;
+        color: #86b7d7 !important;
     }
-    .stMarkdown table td {
-        background-color: #0d1520 !important;
-        color: #c0d8f0 !important;
-        border: 1px solid #1a3a5c !important;
-        padding: 8px 12px;
+    hr {
+        border-color: var(--line) !important;
     }
-    .stMarkdown table tr:hover td {
-        background-color: #122a42 !important;
-    }
-    /* ═══ Spinner ═══ */
-    .stSpinner > div {
-        border-top-color: #4fc3f7 !important;
-    }
-    /* ═══ 底部版权 ═══ */
+    a { color: var(--accent) !important; }
+    a:hover { color: var(--accent-soft) !important; }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-track { background: #0a1018; }
+    ::-webkit-scrollbar-thumb { background: #1a3a5c; border-radius: 5px; }
+    ::-webkit-scrollbar-thumb:hover { background: #2a5a8c; }
     .footer-credit {
         text-align: center;
         color: #3a6080;
-        font-size: 0.7rem;
+        font-size: 0.72rem;
         padding: 8px 0;
-        border-top: 1px solid #1a3a5c;
-        margin-top: 1rem;
+        border-top: 1px solid var(--line);
+        margin-top: 0.8rem;
     }
-    /* ═══ 标注 badge ═══ */
-    .badge-effective {
-        display: inline-block;
-        background: #501E1E;
-        color: #ff8a80;
-        padding: 2px 8px;
-        border-radius: 3px;
-        font-size: 0.8rem;
-        font-weight: 600;
-    }
-    .badge-shielded {
-        display: inline-block;
-        background: #282828;
-        color: #999;
-        padding: 2px 8px;
-        border-radius: 3px;
-        font-size: 0.8rem;
-    }
-    .badge-normal {
-        display: inline-block;
-        background: #0F1E32;
-        color: #80b8d8;
-        padding: 2px 8px;
-        border-radius: 3px;
-        font-size: 0.8rem;
-    }
-    /* ═══ 欢迎页功能卡片 ═══ */
-    .feature-card {
-        background: #0d2137;
-        border: 1px solid #1a3a5c;
-        border-radius: 8px;
-        padding: 16px;
-        margin: 6px 0;
-        transition: all 0.2s;
-    }
-    .feature-card:hover {
-        border-color: #4fc3f7;
-        box-shadow: 0 0 15px rgba(79,195,247,0.15);
-    }
-    .feature-card h4 {
-        color: #4fc3f7 !important;
-        margin: 0 0 6px 0 !important;
-        font-size: 0.95rem !important;
-    }
-    .feature-card p {
-        color: #8090a0;
-        margin: 0;
-        font-size: 0.82rem;
-    }
-    /* ═══ 状态指示点 ═══ */
-    .status-dot {
-        display: inline-block;
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        margin-right: 6px;
-    }
-    .status-dot.green { background: #66bb6a; box-shadow: 0 0 6px #66bb6a; }
-    .status-dot.yellow { background: #ffb74d; box-shadow: 0 0 6px #ffb74d; }
-    .status-dot.red { background: #ef5350; box-shadow: 0 0 6px #ef5350; }
-    .status-dot.blue { background: #4fc3f7; box-shadow: 0 0 6px #4fc3f7; }
 </style>
 """,
     unsafe_allow_html=True,
@@ -496,14 +385,12 @@ def compute_all(airport: Airport):
 def sidebar():
     with st.sidebar:
         # ── 数据导入 ──
-        st.markdown("### 📂 数据导入")
+        st.markdown("### 数据导入控制台")
         st.markdown(
             '<div class="info-box">'
             "<b>支持格式</b><br>"
-            "· PEP TXT（推荐）<br>"
-            "· AIP PDF<br>"
-            "· AIP TXT<br>"
-            "<small>系统自动识别，直接上传即可</small>"
+            "PEP TXT（推荐） / AIP PDF / AIP TXT<br>"
+            "<small>系统自动识别并解析，无需手动选择类型</small>"
             "</div>",
             unsafe_allow_html=True,
         )
@@ -535,7 +422,7 @@ def sidebar():
         if st.session_state.airport:
             ap = st.session_state.airport
             st.markdown("---")
-            st.markdown("### 📋 当前数据")
+            st.markdown("### 当前数据状态")
             st.markdown(
                 f"- **机场** {ap.icao} — {ap.name}\n"
                 f"- **跑道** {len(ap.runways)} 条\n"
@@ -545,7 +432,7 @@ def sidebar():
 
         # ── 资源下载 ──
         st.markdown("---")
-        st.markdown("### 📥 资源下载")
+        st.markdown("### 资源下载")
 
         _download_btn("📖 使用说明书 (MD)", "使用说明书.md", "text/markdown", "manual.md")
         _download_btn("📄 使用说明书 (Word)", "使用说明书.docx",
@@ -557,7 +444,7 @@ def sidebar():
 
         # ── 演示视频 ──
         st.markdown("---")
-        st.markdown("### 🎬 操作演示")
+        st.markdown("### 操作演示")
         vpath = os.path.join(RES, "机场障碍物分析演示.mp4")
         if not os.path.exists(vpath):
             vpath = os.path.join(RES, "demo.mp4")
@@ -588,120 +475,44 @@ def _download_btn(label, fname, mime, alt_fname=None):
 def welcome():
     st.markdown(
         """
-<div style="text-align:center; padding:1rem 0 0.5rem 0;">
-    <span style="font-size:3rem;">✈</span>
-    <h2 style="color:#4fc3f7 !important; margin:0.5rem 0 0 0; letter-spacing:2px;">欢迎使用</h2>
-    <p style="color:#6090b0; font-size:0.85rem;">Airport Obstacle Impact Analysis System</p>
+<div class="panel">
+    <div class="panel-title">QUICK START GUIDE / 操作指南</div>
+    <div class="quick-guide">
+① 导入数据：在左侧上传 PEP TXT / AIP PDF / AIP TXT
+② 核对信息：查看机场信息、跑道/QFU、障碍物页签
+③ 设置离场：在离场参数页填写转弯角及偏移量
+④ 计算导出：进入导出页执行计算并下载 XLSX + TXT
+    </div>
+    <div class="status-strip">SYSTEM READY - 请从左侧导入数据文件开始分析</div>
 </div>
 """,
         unsafe_allow_html=True,
     )
 
-    st.markdown(
-        '<div class="info-box">'
-        "本系统用于分析机场障碍物对飞机起飞离场的影响，遵循 "
-        "<b>ICAO Annex 14</b> 和 <b>PANS-OPS</b> 标准。"
-        "</div>",
-        unsafe_allow_html=True,
-    )
-
-    st.markdown("### 🚀 三步完成分析")
-
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.markdown(
-            '<div class="feature-card">'
-            '<h4>📂 上传文件</h4>'
-            '<p>在左侧边栏上传 PEP TXT / AIP PDF / AIP TXT 文件</p>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-    with c2:
-        st.markdown(
-            '<div class="feature-card">'
-            '<h4>⚙️ 设置参数</h4>'
-            '<p>在「✈️ 离场参数」页签中设置转弯角（直飞可跳过）</p>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-    with c3:
-        st.markdown(
-            '<div class="feature-card">'
-            '<h4>💾 计算导出</h4>'
-            '<p>在「💾 导出」页签点击计算，下载 XLSX 和 TXT 文件</p>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-    st.markdown("---")
-    st.markdown("### 📋 支持的文件格式")
-
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.markdown(
-            '<div class="feature-card">'
-            '<h4>PEP TXT ⭐⭐⭐</h4>'
-            '<p>PEP 系统导出的标准格式文件（推荐）</p>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-    with c2:
-        st.markdown(
-            '<div class="feature-card">'
-            '<h4>AIP PDF ⭐⭐</h4>'
-            '<p>从 AIP 网站下载的 PDF 原始数据</p>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-    with c3:
-        st.markdown(
-            '<div class="feature-card">'
-            '<h4>AIP TXT ⭐⭐</h4>'
-            '<p>AIP PDF 转存的纯文本文件</p>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-    st.markdown("---")
-    st.markdown("### ✨ 核心功能")
-
     c1, c2 = st.columns(2)
     with c1:
         st.markdown(
-            '<div class="feature-card">'
-            '<h4>🔍 自动解析</h4>'
-            '<p>智能识别 PEP/AIP 格式并提取机场、跑道、障碍物数据</p>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            '<div class="feature-card">'
-            '<h4>📐 标准计算</h4>'
-            '<p>ICAO 1.2% 梯度面 + 保护区包线判定</p>'
+            '<div class="panel">'
+            '<div class="panel-title">支持格式</div>'
+            'PEP TXT（推荐）<br>'
+            'AIP PDF<br>'
+            'AIP TXT'
             '</div>',
             unsafe_allow_html=True,
         )
     with c2:
         st.markdown(
-            '<div class="feature-card">'
-            '<h4>🛡️ 遮蔽检测</h4>'
-            '<p>自动识别被遮蔽的障碍物</p>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-        st.markdown(
-            '<div class="feature-card">'
-            '<h4>📊 双格式导出</h4>'
-            '<p>含公式的 XLSX 报表 + 可导入 PEP 的 TXT 文件</p>'
+            '<div class="panel">'
+            '<div class="panel-title">核心能力</div>'
+            '自动解析机场/跑道/障碍物数据<br>'
+            'ICAO 标准梯度面计算与遮蔽判定<br>'
+            '导出 Excel + PEP TXT'
             '</div>',
             unsafe_allow_html=True,
         )
 
-    st.markdown("---")
     st.markdown(
-        '<div class="info-box" style="text-align:center;">'
-        '👈 请在 <b>左侧边栏</b> 上传数据文件开始分析'
-        '</div>',
+        '<div class="ok-box">左侧为导入与资源区，导入后按页签顺序完成核对、参数设置和导出。</div>',
         unsafe_allow_html=True,
     )
 
@@ -710,7 +521,7 @@ def welcome():
 # Tab 1: 机场信息
 # ═══════════════════════════════════════════════════════════
 def tab_airport(ap: Airport):
-    st.markdown("### 🏛️ 机场基本信息")
+    st.markdown("### 机场基本信息")
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("ICAO", ap.icao or "—")
@@ -742,8 +553,8 @@ def tab_airport(ap: Airport):
 def tab_runway(ap: Airport):
     import pandas as pd
 
-    st.markdown("### 🛤️ 跑道 / QFU 数据")
-    st.caption("🔵 蓝色 = 交叉起飞点 · 🟢 绿色 = ILS · ⬜ 默认 = 标准方向")
+    st.markdown("### 跑道 / QFU 数据")
+    st.caption("蓝色 = 交叉起飞点 · 绿色 = ILS · 默认 = 标准方向")
 
     for ri, rwy in enumerate(ap.runways):
         with st.expander(
@@ -789,7 +600,7 @@ def tab_runway(ap: Airport):
 def tab_obstacle(ap: Airport):
     import pandas as pd
 
-    st.markdown("### 🗼 障碍物数据 (AD 2.10)")
+    st.markdown("### 障碍物数据 (AD 2.10)")
     if not ap.obstacles:
         st.warning("暂无障碍物数据")
         return
@@ -814,7 +625,7 @@ def tab_obstacle(ap: Airport):
 # Tab 4: 离场参数
 # ═══════════════════════════════════════════════════════════
 def tab_departure(ap: Airport):
-    st.markdown("### ✈️ 离场参数设置")
+    st.markdown("### 离场参数设置")
 
     st.markdown(
         '<div class="info-box">'
@@ -898,7 +709,7 @@ def tab_departure(ap: Airport):
 def tab_results(ap: Airport):
     import pandas as pd
 
-    st.markdown("### 📊 分析结果")
+    st.markdown("### 分析结果")
 
     if not st.session_state.computed:
         st.info("⏳ 请先在「💾 导出」页签点击 **计算分析** 按钮")
@@ -955,7 +766,7 @@ def tab_results(ap: Airport):
 # Tab 6: 导出
 # ═══════════════════════════════════════════════════════════
 def tab_export(ap: Airport):
-    st.markdown("### 💾 计算与导出")
+    st.markdown("### 计算与导出")
 
     # ── 第一步 ──
     st.markdown(
@@ -1067,7 +878,16 @@ def main():
         "</div>",
         unsafe_allow_html=True,
     )
-    st.markdown("---")
+
+    st.markdown(
+        '<div class="panel">'
+        '<div class="panel-title">操作流程 / WORKFLOW</div>'
+        '<div class="quick-guide">'
+        '① 导入文件 → ② 核对机场与跑道信息 → ③ 设置离场参数 → ④ 计算并导出结果'
+        '</div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
     sidebar()
 
@@ -1076,12 +896,12 @@ def main():
     else:
         ap = st.session_state.airport
         t1, t2, t3, t4, t5, t6 = st.tabs([
-            "🏛️ 机场信息",
-            "🛤️ 跑道/QFU",
-            "🗼 障碍物",
-            "✈️ 离场参数",
-            "📊 分析结果",
-            "💾 导出",
+            "机场信息",
+            "跑道/QFU",
+            "障碍物",
+            "离场参数",
+            "分析结果",
+            "导出",
         ])
         with t1:
             tab_airport(ap)
