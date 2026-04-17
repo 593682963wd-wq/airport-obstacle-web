@@ -40,55 +40,69 @@ st.set_page_config(
 st.markdown(
     """
 <style>
-    /* 全局字体 */
+    /* ═══ 全局字体 ═══ */
     html, body, [class*="css"] {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-family: "Menlo", "Consolas", "SF Mono", "Monaco", monospace;
+        color: #c0d8f0;
     }
-    /* 标题区域 */
+    /* ═══ 主背景 & 文字 ═══ */
+    .stApp, .main .block-container {
+        background-color: #0a0e17;
+    }
+    /* ═══ 标题区域 ═══ */
     .main-header {
         text-align: center;
-        padding: 0.5rem 0 0.2rem 0;
+        padding: 1.2rem 0 0.5rem 0;
+        border-bottom: 1px solid #1a3a5c;
+        margin-bottom: 0.8rem;
     }
     .main-header h1 {
-        color: #1565C0;
+        color: #4fc3f7;
         font-size: 1.8rem;
+        font-weight: 700;
+        letter-spacing: 2px;
         margin-bottom: 0;
+        text-shadow: 0 0 20px rgba(79,195,247,0.3);
     }
     .main-header p {
-        color: #78909C;
-        font-size: 0.85rem;
-        margin-top: 0.2rem;
+        color: #6090b0;
+        font-size: 0.8rem;
+        margin-top: 0.3rem;
+        letter-spacing: 1px;
     }
-    /* 信息卡片 */
+    /* ═══ 信息卡片 — 深蓝科幻风 ═══ */
     .info-box {
-        background: #E3F2FD;
-        border-left: 4px solid #1565C0;
+        background: #0d2137;
+        border-left: 3px solid #4fc3f7;
         padding: 12px 16px;
         border-radius: 4px;
         margin: 8px 0;
-        font-size: 0.9rem;
+        font-size: 0.85rem;
+        color: #c0d8f0;
     }
     .warn-box {
-        background: #FFF3E0;
-        border-left: 4px solid #FF9800;
+        background: #1a1a0d;
+        border-left: 3px solid #ffb74d;
         padding: 12px 16px;
         border-radius: 4px;
         margin: 8px 0;
-        font-size: 0.9rem;
+        font-size: 0.85rem;
+        color: #e0c890;
     }
     .ok-box {
-        background: #E8F5E9;
-        border-left: 4px solid #4CAF50;
+        background: #0d1f14;
+        border-left: 3px solid #66bb6a;
         padding: 12px 16px;
         border-radius: 4px;
         margin: 8px 0;
-        font-size: 0.9rem;
+        font-size: 0.85rem;
+        color: #a0d8b0;
     }
-    /* 步骤指示 */
+    /* ═══ 步骤指示 ═══ */
     .step-num {
         display: inline-block;
-        background: #1565C0;
-        color: white;
+        background: #4fc3f7;
+        color: #0a0e17;
         width: 28px;
         height: 28px;
         border-radius: 50%;
@@ -97,14 +111,281 @@ st.markdown(
         font-weight: bold;
         margin-right: 8px;
     }
-    /* 侧边栏 */
+    /* ═══ 侧边栏 ═══ */
     section[data-testid="stSidebar"] > div {
+        background-color: #0d1520;
         padding-top: 1rem;
     }
-    /* 下载按钮全宽 */
+    section[data-testid="stSidebar"] {
+        background-color: #0d1520;
+        border-right: 1px solid #1a3a5c;
+    }
+    /* ═══ 下载按钮 ═══ */
     .stDownloadButton > button {
         width: 100%;
+        background-color: #0d2137 !important;
+        color: #4fc3f7 !important;
+        border: 1px solid #1a5276 !important;
+        font-family: "Menlo", "Consolas", monospace !important;
     }
+    .stDownloadButton > button:hover {
+        background-color: #153d5e !important;
+        border-color: #4fc3f7 !important;
+    }
+    /* ═══ 普通按钮 ═══ */
+    .stButton > button {
+        background-color: #0d2137 !important;
+        color: #4fc3f7 !important;
+        border: 1px solid #1a5276 !important;
+        border-radius: 4px;
+        font-family: "Menlo", "Consolas", monospace !important;
+        transition: all 0.2s;
+    }
+    .stButton > button:hover {
+        background-color: #153d5e !important;
+        border-color: #4fc3f7 !important;
+    }
+    .stButton > button[kind="primary"],
+    button[data-testid="stBaseButton-primary"] {
+        background-color: #1a5276 !important;
+        color: #4fc3f7 !important;
+        border: 1px solid #4fc3f7 !important;
+    }
+    button[data-testid="stBaseButton-primary"]:hover {
+        background-color: #2a6a96 !important;
+    }
+    /* ═══ Tabs ═══ */
+    .stTabs [data-baseweb="tab-list"] {
+        background-color: #0a1520;
+        border-bottom: 1px solid #1a3a5c;
+        gap: 0;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background-color: #0a1520;
+        color: #6090b0;
+        border: none;
+        padding: 10px 20px;
+        font-family: "Menlo", "Consolas", monospace;
+        font-size: 0.85rem;
+    }
+    .stTabs [data-baseweb="tab"]:hover {
+        background-color: #122a42;
+        color: #80d0f8;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #0d2137 !important;
+        color: #4fc3f7 !important;
+        border-bottom: 2px solid #4fc3f7 !important;
+    }
+    .stTabs [data-baseweb="tab-panel"] {
+        background-color: #0d1520;
+        border: 1px solid #1a3a5c;
+        border-top: none;
+        padding: 1.2rem;
+        border-radius: 0 0 6px 6px;
+    }
+    /* ═══ Metric 卡片 ═══ */
+    [data-testid="stMetric"] {
+        background-color: #0d2137;
+        border: 1px solid #1a3a5c;
+        padding: 12px 16px;
+        border-radius: 6px;
+    }
+    [data-testid="stMetricLabel"] {
+        color: #6090b0 !important;
+        font-size: 0.8rem;
+    }
+    [data-testid="stMetricValue"] {
+        color: #4fc3f7 !important;
+        font-weight: 700;
+    }
+    /* ═══ Expander ═══ */
+    .streamlit-expanderHeader {
+        background-color: #0d2137 !important;
+        color: #4fc3f7 !important;
+        border: 1px solid #1a3a5c;
+        border-radius: 4px;
+    }
+    details {
+        border: 1px solid #1a3a5c !important;
+        border-radius: 6px !important;
+        background-color: #0d1520 !important;
+    }
+    details summary {
+        background-color: #0d2137 !important;
+        color: #4fc3f7 !important;
+    }
+    /* ═══ DataFrame / 表格 ═══ */
+    [data-testid="stDataFrame"],
+    .stDataFrame {
+        border: 1px solid #1a3a5c;
+        border-radius: 4px;
+    }
+    /* ═══ 输入框 ═══ */
+    .stSelectbox > div > div,
+    .stNumberInput > div > div > input,
+    .stTextInput > div > div > input {
+        background-color: #0d1a28 !important;
+        border-color: #1a3a5c !important;
+        color: #c0d8f0 !important;
+    }
+    .stSelectbox > div > div:focus-within,
+    .stNumberInput > div > div > input:focus {
+        border-color: #4fc3f7 !important;
+    }
+    /* ═══ 文件上传 ═══ */
+    [data-testid="stFileUploader"] {
+        border: 1px dashed #1a5276;
+        border-radius: 6px;
+        padding: 8px;
+        background-color: #0d1a28;
+    }
+    [data-testid="stFileUploader"]:hover {
+        border-color: #4fc3f7;
+    }
+    /* ═══ HR/分隔线 ═══ */
+    hr {
+        border-color: #1a3a5c !important;
+    }
+    /* ═══ 链接 ═══ */
+    a {
+        color: #4fc3f7 !important;
+    }
+    a:hover {
+        color: #80d0f8 !important;
+    }
+    /* ═══ 代码块 ═══ */
+    code, .stCodeBlock {
+        background-color: #0a1018 !important;
+        color: #80b8d8 !important;
+    }
+    /* ═══ 滚动条 ═══ */
+    ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+    ::-webkit-scrollbar-track {
+        background: #0a1018;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #1a3a5c;
+        border-radius: 5px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #2a5a8c;
+    }
+    /* ═══ 成功/警告/错误提示 ═══ */
+    .stAlert > div[data-baseweb="notification"] {
+        background-color: #0d1a28 !important;
+        border: 1px solid #1a3a5c !important;
+    }
+    /* ═══ Caption ═══ */
+    .stCaption, small {
+        color: #4a7090 !important;
+    }
+    /* ═══ Markdown 标题 ═══ */
+    h1, h2, h3, h4, h5, h6 {
+        color: #4fc3f7 !important;
+        font-family: "Menlo", "Consolas", monospace !important;
+    }
+    h3 {
+        border-bottom: 1px solid #1a3a5c;
+        padding-bottom: 0.4rem;
+    }
+    /* ═══ 表格内文字 ═══ */
+    .stMarkdown table {
+        border-collapse: collapse;
+    }
+    .stMarkdown table th {
+        background-color: #0d2137 !important;
+        color: #4fc3f7 !important;
+        border: 1px solid #1a3a5c !important;
+        padding: 8px 12px;
+        font-weight: 700;
+    }
+    .stMarkdown table td {
+        background-color: #0d1520 !important;
+        color: #c0d8f0 !important;
+        border: 1px solid #1a3a5c !important;
+        padding: 8px 12px;
+    }
+    .stMarkdown table tr:hover td {
+        background-color: #122a42 !important;
+    }
+    /* ═══ Spinner ═══ */
+    .stSpinner > div {
+        border-top-color: #4fc3f7 !important;
+    }
+    /* ═══ 底部版权 ═══ */
+    .footer-credit {
+        text-align: center;
+        color: #3a6080;
+        font-size: 0.7rem;
+        padding: 8px 0;
+        border-top: 1px solid #1a3a5c;
+        margin-top: 1rem;
+    }
+    /* ═══ 标注 badge ═══ */
+    .badge-effective {
+        display: inline-block;
+        background: #501E1E;
+        color: #ff8a80;
+        padding: 2px 8px;
+        border-radius: 3px;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    .badge-shielded {
+        display: inline-block;
+        background: #282828;
+        color: #999;
+        padding: 2px 8px;
+        border-radius: 3px;
+        font-size: 0.8rem;
+    }
+    .badge-normal {
+        display: inline-block;
+        background: #0F1E32;
+        color: #80b8d8;
+        padding: 2px 8px;
+        border-radius: 3px;
+        font-size: 0.8rem;
+    }
+    /* ═══ 欢迎页功能卡片 ═══ */
+    .feature-card {
+        background: #0d2137;
+        border: 1px solid #1a3a5c;
+        border-radius: 8px;
+        padding: 16px;
+        margin: 6px 0;
+        transition: all 0.2s;
+    }
+    .feature-card:hover {
+        border-color: #4fc3f7;
+        box-shadow: 0 0 15px rgba(79,195,247,0.15);
+    }
+    .feature-card h4 {
+        color: #4fc3f7 !important;
+        margin: 0 0 6px 0 !important;
+        font-size: 0.95rem !important;
+    }
+    .feature-card p {
+        color: #8090a0;
+        margin: 0;
+        font-size: 0.82rem;
+    }
+    /* ═══ 状态指示点 ═══ */
+    .status-dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 6px;
+    }
+    .status-dot.green { background: #66bb6a; box-shadow: 0 0 6px #66bb6a; }
+    .status-dot.yellow { background: #ffb74d; box-shadow: 0 0 6px #ffb74d; }
+    .status-dot.red { background: #ef5350; box-shadow: 0 0 6px #ef5350; }
+    .status-dot.blue { background: #4fc3f7; box-shadow: 0 0 6px #4fc3f7; }
 </style>
 """,
     unsafe_allow_html=True,
@@ -285,7 +566,7 @@ def sidebar():
 
         st.markdown("---")
         st.markdown(
-            '<p style="text-align:center;color:#aaa;font-size:0.75rem;">'
+            '<p class="footer-credit">'
             "v1.0 · 作者: 王迪 · ICAO Annex 14</p>",
             unsafe_allow_html=True,
         )
@@ -307,54 +588,122 @@ def _download_btn(label, fname, mime, alt_fname=None):
 def welcome():
     st.markdown(
         """
-## 👋 欢迎使用
-
-本系统用于分析机场障碍物对飞机起飞离场的影响，遵循 **ICAO Annex 14** 和 **PANS-OPS** 标准。
-
----
-
-### 🚀 三步完成分析
-
-| | 步骤 | 操作说明 |
-|:---:|------|----------|
-| <span class="step-num">1</span> | **上传文件** | 在左侧边栏上传 PEP TXT / AIP PDF / AIP TXT 文件 |
-| <span class="step-num">2</span> | **设置参数** | 在「✈️ 离场参数」页签中设置转弯角（直飞可跳过） |
-| <span class="step-num">3</span> | **计算导出** | 在「💾 导出」页签点击计算，下载 XLSX 和 TXT 文件 |
-
----
-
-### 📋 支持的文件格式
-
-| 格式 | 说明 | 推荐度 |
-|------|------|:------:|
-| **PEP TXT** | PEP 系统导出的标准格式文件 | ⭐⭐⭐ |
-| **AIP PDF** | 从 AIP 网站下载的 PDF 原始数据 | ⭐⭐ |
-| **AIP TXT** | AIP PDF 转存的纯文本文件 | ⭐⭐ |
-
----
-
-### ✨ 核心功能
-
-- 🔍 **自动解析** — 智能识别 PEP/AIP 格式并提取机场、跑道、障碍物数据
-- 📐 **标准计算** — ICAO 1.2% 梯度面 + 保护区包线判定
-- 🛡️ **遮蔽检测** — 自动识别被遮蔽的障碍物
-- 📊 **Excel 报表** — 含完整公式的 XLSX 分析工作簿
-- 📝 **PEP 输出** — 可直接导入 PEP 系统的标准 TXT 文件
-
----
-
-### 📥 资源下载
-
-左侧边栏提供以下资源，可随时下载：
-- 📖 **使用说明书** — 详细的操作指南和计算原理
-- 📊 **系统介绍PPT** — 系统功能概览
-- 🎬 **操作演示视频** — 完整的操作流程演示
-
+<div style="text-align:center; padding:1rem 0 0.5rem 0;">
+    <span style="font-size:3rem;">✈</span>
+    <h2 style="color:#4fc3f7 !important; margin:0.5rem 0 0 0; letter-spacing:2px;">欢迎使用</h2>
+    <p style="color:#6090b0; font-size:0.85rem;">Airport Obstacle Impact Analysis System</p>
+</div>
 """,
         unsafe_allow_html=True,
     )
 
-    st.info("👈 请在 **左侧边栏** 上传数据文件开始分析")
+    st.markdown(
+        '<div class="info-box">'
+        "本系统用于分析机场障碍物对飞机起飞离场的影响，遵循 "
+        "<b>ICAO Annex 14</b> 和 <b>PANS-OPS</b> 标准。"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("### 🚀 三步完成分析")
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.markdown(
+            '<div class="feature-card">'
+            '<h4>📂 上传文件</h4>'
+            '<p>在左侧边栏上传 PEP TXT / AIP PDF / AIP TXT 文件</p>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+    with c2:
+        st.markdown(
+            '<div class="feature-card">'
+            '<h4>⚙️ 设置参数</h4>'
+            '<p>在「✈️ 离场参数」页签中设置转弯角（直飞可跳过）</p>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+    with c3:
+        st.markdown(
+            '<div class="feature-card">'
+            '<h4>💾 计算导出</h4>'
+            '<p>在「💾 导出」页签点击计算，下载 XLSX 和 TXT 文件</p>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("---")
+    st.markdown("### 📋 支持的文件格式")
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.markdown(
+            '<div class="feature-card">'
+            '<h4>PEP TXT ⭐⭐⭐</h4>'
+            '<p>PEP 系统导出的标准格式文件（推荐）</p>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+    with c2:
+        st.markdown(
+            '<div class="feature-card">'
+            '<h4>AIP PDF ⭐⭐</h4>'
+            '<p>从 AIP 网站下载的 PDF 原始数据</p>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+    with c3:
+        st.markdown(
+            '<div class="feature-card">'
+            '<h4>AIP TXT ⭐⭐</h4>'
+            '<p>AIP PDF 转存的纯文本文件</p>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("---")
+    st.markdown("### ✨ 核心功能")
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown(
+            '<div class="feature-card">'
+            '<h4>🔍 自动解析</h4>'
+            '<p>智能识别 PEP/AIP 格式并提取机场、跑道、障碍物数据</p>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            '<div class="feature-card">'
+            '<h4>📐 标准计算</h4>'
+            '<p>ICAO 1.2% 梯度面 + 保护区包线判定</p>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+    with c2:
+        st.markdown(
+            '<div class="feature-card">'
+            '<h4>🛡️ 遮蔽检测</h4>'
+            '<p>自动识别被遮蔽的障碍物</p>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            '<div class="feature-card">'
+            '<h4>📊 双格式导出</h4>'
+            '<p>含公式的 XLSX 报表 + 可导入 PEP 的 TXT 文件</p>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("---")
+    st.markdown(
+        '<div class="info-box" style="text-align:center;">'
+        '👈 请在 <b>左侧边栏</b> 上传数据文件开始分析'
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
 
 # ═══════════════════════════════════════════════════════════
@@ -394,7 +743,7 @@ def tab_runway(ap: Airport):
     import pandas as pd
 
     st.markdown("### 🛤️ 跑道 / QFU 数据")
-    st.caption("🔵 蓝色 = 交叉起飞点 · 🟢 绿色 = 有 ILS · ⬜ 白色 = 标准方向")
+    st.caption("🔵 蓝色 = 交叉起飞点 · 🟢 绿色 = ILS · ⬜ 默认 = 标准方向")
 
     for ri, rwy in enumerate(ap.runways):
         with st.expander(
@@ -425,10 +774,10 @@ def tab_runway(ap: Airport):
 
             def _color(row):
                 if row["类型"] == "交叉起飞点":
-                    return ["background-color:#E3F2FD"] * len(row)
+                    return ["background-color:#283C50; color:#c0d8f0"] * len(row)
                 if row["类型"] == "ILS":
-                    return ["background-color:#E8F5E9"] * len(row)
-                return [""] * len(row)
+                    return ["background-color:#143C28; color:#a0d8b0"] * len(row)
+                return ["background-color:#0F1928; color:#c0d8f0"] * len(row)
 
             st.dataframe(df.style.apply(_color, axis=1),
                          use_container_width=True, hide_index=True)
@@ -586,10 +935,10 @@ def tab_results(ap: Airport):
 
                 def _c(row):
                     if "有效" in str(row["判定"]):
-                        return ["background-color:#FFCDD2"] * len(row)
+                        return ["background-color:#501E1E; color:#ff8a80"] * len(row)
                     if "遮蔽" in str(row["判定"]):
-                        return ["background-color:#E0E0E0"] * len(row)
-                    return ["background-color:#E3F2FD"] * len(row)
+                        return ["background-color:#282828; color:#999"] * len(row)
+                    return ["background-color:#0F1E32; color:#80b8d8"] * len(row)
 
                 st.dataframe(df.style.apply(_c, axis=1),
                              use_container_width=True, hide_index=True)
