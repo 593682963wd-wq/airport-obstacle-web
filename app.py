@@ -266,16 +266,20 @@ def sidebar():
         st.markdown("---")
         st.markdown("### 📥 资源下载")
 
-        _download_btn("📖 使用说明书 (MD)", "使用说明书.md", "text/markdown")
+        _download_btn("📖 使用说明书 (MD)", "使用说明书.md", "text/markdown", "manual.md")
         _download_btn("📄 使用说明书 (Word)", "使用说明书.docx",
-                      "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+                      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                      "manual.docx")
         _download_btn("📊 系统介绍PPT", "机场障碍物分析系统介绍.pptx",
-                      "application/vnd.openxmlformats-officedocument.presentationml.presentation")
+                      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                      "intro.pptx")
 
         # ── 演示视频 ──
         st.markdown("---")
         st.markdown("### 🎬 操作演示")
         vpath = os.path.join(RES, "机场障碍物分析演示.mp4")
+        if not os.path.exists(vpath):
+            vpath = os.path.join(RES, "demo.mp4")
         if os.path.exists(vpath):
             st.video(vpath)
 
@@ -287,8 +291,10 @@ def sidebar():
         )
 
 
-def _download_btn(label, fname, mime):
+def _download_btn(label, fname, mime, alt_fname=None):
     fpath = os.path.join(RES, fname)
+    if not os.path.exists(fpath) and alt_fname:
+        fpath = os.path.join(RES, alt_fname)
     if os.path.exists(fpath):
         with open(fpath, "rb") as f:
             st.download_button(label, f.read(), file_name=fname, mime=mime,
