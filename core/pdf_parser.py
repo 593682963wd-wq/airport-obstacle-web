@@ -55,23 +55,10 @@ def parse_aip_pdf(filepath: str) -> Airport:
                 if qfu.glide_slope is None:
                     qfu.glide_slope = -3
 
-    # 根据入口标高差计算有效坡度(对多段坡度场景更准确, 保证同跑道两端坡度互为相反数)
-    for rwy in airport.runways:
-        mains = rwy.main_qfus
-        if len(mains) == 2 and rwy.max_length > 0:
-            t0 = mains[0].threshold_elevation
-            t1 = mains[1].threshold_elevation
-            if t0 > 0 and t1 > 0:
-                eff_slope = round((t1 - t0) / rwy.max_length * 100, 2)
-                mains[0].slope = eff_slope
-                mains[1].slope = -eff_slope
-                # 同步交叉起飞点坡度
-                for iq in rwy.intersection_qfus:
-                    parent_ident = iq.ident.split()[0] if " " in iq.ident else iq.ident
-                    if parent_ident == mains[0].ident:
-                        iq.slope = mains[0].slope
-                    elif parent_ident == mains[1].ident:
-                        iq.slope = mains[1].slope
+    # 坡度取值规则: 直接使用 AIP AD 2.12 "跑道和停止道坡度" 列中各 QFU 公布的
+    # 第一段坡度值 (parser 已在 _parse_ad212 中按 QFU 行抓取首个 "x.xx%" 段);
+    # 交叉起飞点 (intersection QFU) 继承父 QFU 的坡度 (在 _parse_ad213 中处理).
+    # 不再用 (t1-t0)/L 公式覆盖, 该公式假设两端坡度互为相反数, 与 AIP 公布值不符.
 
     return airport
 

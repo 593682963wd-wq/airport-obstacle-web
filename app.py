@@ -15,11 +15,20 @@ from copy import deepcopy
 from core.models import Airport, Runway, QFU, Obstacle, ObstacleResult
 from core.pdf_parser import parse_aip_pdf
 from core.txt_parser import parse_aip_txt
-from core.pep_parser import parse_pep_txt
 from core.geometry import compute_obstacle_results, compute_ht_ft, apply_shielding
 from core.xlsx_writer import generate_xlsx
 from core.txt_writer import write_txt, generate_txt
 from templates.constants import M_TO_FT
+
+# ══════════════════════════════════════════════════════════════════
+# 版本号 — 语义化版本规则 (大厂通行: MAJOR.MINOR.PATCH)
+#   v1.0.0  首次发布
+#   v1.0.1  ApproachSlope/PEP round-trip 修复
+#   v1.1.0  UI 重构: 步骤卡片, 主按钮高亮, 作者信息, 版本徽标; 移除 PEP TXT 导入入口
+# ══════════════════════════════════════════════════════════════════
+APP_VERSION = "v1.1.0"
+AUTHOR = "王迪"
+TECH_SUPPORT = "邵小隆"
 
 # ═══════════════════════════════════════════════════════════
 # 页面配置
@@ -66,6 +75,7 @@ st.markdown(
         padding-bottom: 1.2rem;
     }
     .main-header {
+        position: relative;
         text-align: center;
         padding: 0.8rem 0 0.4rem 0;
         border-bottom: 1px solid var(--line);
@@ -83,6 +93,40 @@ st.markdown(
         margin: 0.2rem 0 0 0;
         font-size: 0.8rem;
         letter-spacing: 1px;
+    }
+    /* ── 右上角作者+版本徽标 ── */
+    .header-meta {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        text-align: right;
+        line-height: 1.45;
+    }
+    .header-meta .badge-version {
+        display: inline-block;
+        background: var(--panel-strong);
+        color: #50fa7b;
+        border: 1px solid #50fa7b;
+        border-radius: 12px;
+        padding: 1px 10px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        font-family: "Menlo", monospace;
+        letter-spacing: 0.5px;
+        margin-bottom: 4px;
+    }
+    .header-meta .credit-author {
+        color: #ff79c6;
+        font-size: 0.74rem;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        margin: 1px 0;
+    }
+    .header-meta .credit-tech {
+        color: #bd93f9;
+        font-size: 0.74rem;
+        font-weight: 700;
+        letter-spacing: 0.5px;
     }
     .panel {
         background: var(--panel);
@@ -160,8 +204,74 @@ st.markdown(
         background: #153d5e !important;
     }
     button[data-testid="stBaseButton-primary"] {
-        background: #1a5276 !important;
-        border-color: var(--accent) !important;
+        background: linear-gradient(180deg, #1d6f3a 0%, #155a2c 100%) !important;
+        color: #f0fff4 !important;
+        border: 2px solid #50fa7b !important;
+        font-weight: 700 !important;
+        font-size: 1rem !important;
+        min-height: 2.8rem !important;
+        letter-spacing: 1px !important;
+        box-shadow: 0 0 12px rgba(80, 250, 123, 0.25) !important;
+    }
+    button[data-testid="stBaseButton-primary"]:hover {
+        background: linear-gradient(180deg, #2a9050 0%, #1a7a3a 100%) !important;
+        border-color: #88ffaa !important;
+        box-shadow: 0 0 16px rgba(80, 250, 123, 0.45) !important;
+    }
+    /* 文件上传器突出显示 (主操作) */
+    [data-testid="stFileUploader"] {
+        border: 2px dashed #4fc3f7 !important;
+        border-radius: 8px !important;
+        background: #0d2137 !important;
+        padding: 4px;
+        box-shadow: 0 0 8px rgba(79, 195, 247, 0.2);
+    }
+    [data-testid="stFileUploader"]:hover {
+        border-color: #80d0f8 !important;
+        box-shadow: 0 0 14px rgba(79, 195, 247, 0.4);
+    }
+    /* ── 步骤卡片 (操作指南) ── */
+    .step-card {
+        background: linear-gradient(180deg, #0d1d30 0%, #0a1726 100%);
+        border: 1px solid #1a4a6c;
+        border-radius: 8px;
+        padding: 14px 14px 12px 14px;
+        height: 100%;
+        min-height: 130px;
+        position: relative;
+        transition: border-color 0.2s;
+    }
+    .step-card:hover {
+        border-color: var(--accent);
+    }
+    .step-card .step-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 8px;
+    }
+    .step-card .step-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px; height: 28px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: var(--bg);
+        font-weight: 800;
+        font-size: 14px;
+        flex-shrink: 0;
+    }
+    .step-card .step-title {
+        color: var(--accent);
+        font-weight: 700;
+        font-size: 0.95rem;
+        letter-spacing: 0.5px;
+    }
+    .step-card .step-desc {
+        color: #8ab4d4;
+        font-size: 0.78rem;
+        line-height: 1.55;
     }
     .stTabs [data-baseweb="tab-list"] {
         background: transparent;
@@ -226,14 +336,6 @@ st.markdown(
     .stTextInput > div > div > input:focus,
     .stTextArea textarea:focus {
         border-color: var(--accent) !important;
-    }
-    [data-testid="stFileUploader"] {
-        border: 1px dashed var(--line-strong);
-        border-radius: 6px;
-        background: #0d1a28;
-    }
-    [data-testid="stFileUploader"]:hover {
-        border-color: var(--accent);
     }
     [data-testid="stDataFrame"] {
         border: 1px solid var(--line);
@@ -306,7 +408,8 @@ RES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "resources")
 # 核心逻辑（与 UI 无关）
 # ═══════════════════════════════════════════════════════════
 def detect_and_parse(uploaded):
-    """自动识别文件类型并解析为 Airport 对象."""
+    """自动识别文件类型并解析为 Airport 对象。
+    支持: AIP PDF / AIP TXT (不再支持 PEP TXT 导入)。"""
     raw = uploaded.getvalue()
     ext = os.path.splitext(uploaded.name)[1].lower()
     suffix = ".pdf" if ext == ".pdf" else ".txt"
@@ -320,7 +423,10 @@ def detect_and_parse(uploaded):
             return parse_aip_pdf(tmp_path), False, "AIP PDF"
         text = raw.decode("utf-8", errors="ignore")
         if text.strip().startswith("Version="):
-            return parse_pep_txt(tmp_path), True, "PEP TXT"
+            raise ValueError(
+                "检测到 PEP TXT 文件。当前版本已移除 PEP TXT 导入功能，"
+                "请上传 AIP PDF 或 AIP TXT 原始数据文件。"
+            )
         return parse_aip_txt(tmp_path), False, "AIP TXT"
     finally:
         try:
@@ -389,7 +495,7 @@ def sidebar():
         st.markdown(
             '<div class="info-box">'
             "<b>支持格式</b><br>"
-            "PEP TXT（推荐） / AIP PDF / AIP TXT<br>"
+            "AIP PDF（推荐） / AIP TXT<br>"
             "<small>系统自动识别并解析，无需手动选择类型</small>"
             "</div>",
             unsafe_allow_html=True,
@@ -398,7 +504,7 @@ def sidebar():
         uploaded = st.file_uploader(
             "上传数据文件",
             type=["txt", "pdf"],
-            help="点击或拖拽上传机场障碍物数据文件",
+            help="点击或拖拽上传 AIP PDF / AIP TXT",
         )
 
         if uploaded is not None:
@@ -453,8 +559,8 @@ def sidebar():
 
         st.markdown("---")
         st.markdown(
-            '<p class="footer-credit">'
-            "v1.0 · 作者: 王迪 · ICAO Annex 14</p>",
+            f'<p class="footer-credit">'
+            f"{APP_VERSION} · 程序设计：{AUTHOR} · 技术支持：{TECH_SUPPORT}</p>",
             unsafe_allow_html=True,
         )
 
@@ -473,17 +579,26 @@ def _download_btn(label, fname, mime, alt_fname=None):
 # 欢迎页
 # ═══════════════════════════════════════════════════════════
 def welcome():
+    st.markdown("### 操作指南 · QUICK START GUIDE")
     st.markdown(
         """
-<div class="panel">
-    <div class="panel-title">QUICK START GUIDE / 操作指南</div>
-    <div class="quick-guide">
-① 导入数据：在左侧上传 PEP TXT / AIP PDF / AIP TXT
-② 核对信息：查看机场信息、跑道/QFU、障碍物页签
-③ 设置离场：在离场参数页填写转弯角及偏移量
-④ 计算导出：进入导出页执行计算并下载 XLSX + TXT
-    </div>
-    <div class="status-strip">SYSTEM READY - 请从左侧导入数据文件开始分析</div>
+<div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; margin: 4px 0 18px 0;">
+  <div class="step-card">
+    <div class="step-head"><div class="step-badge">1</div><div class="step-title">导入数据</div></div>
+    <div class="step-desc">在左侧上传 <b>AIP PDF</b> 或 <b>AIP TXT</b>，系统自动识别格式并解析。</div>
+  </div>
+  <div class="step-card">
+    <div class="step-head"><div class="step-badge">2</div><div class="step-title">核对信息</div></div>
+    <div class="step-desc">在「机场信息 / 跑道·QFU / 障碍物」页签核对解析结果，可直接在表格中修改。</div>
+  </div>
+  <div class="step-card">
+    <div class="step-head"><div class="step-badge">3</div><div class="step-title">设置离场</div></div>
+    <div class="step-desc">在「离场参数」页签为各 QFU 配置离场转弯角和坐标偏移参数。</div>
+  </div>
+  <div class="step-card">
+    <div class="step-head"><div class="step-badge">4</div><div class="step-title">计算导出</div></div>
+    <div class="step-desc">在「导出」页签点击 <b>计算分析</b>，下载 <b>XLSX + TXT</b> 分析报告。</div>
+  </div>
 </div>
 """,
         unsafe_allow_html=True,
@@ -494,8 +609,7 @@ def welcome():
         st.markdown(
             '<div class="panel">'
             '<div class="panel-title">支持格式</div>'
-            'PEP TXT（推荐）<br>'
-            'AIP PDF<br>'
+            'AIP PDF（推荐）<br>'
             'AIP TXT'
             '</div>',
             unsafe_allow_html=True,
@@ -512,7 +626,7 @@ def welcome():
         )
 
     st.markdown(
-        '<div class="ok-box">左侧为导入与资源区，导入后按页签顺序完成核对、参数设置和导出。</div>',
+        '<div class="ok-box">SYSTEM READY · 请从左侧导入 AIP 数据文件开始分析</div>',
         unsafe_allow_html=True,
     )
 
@@ -943,10 +1057,11 @@ def tab_export(ap: Airport):
             unsafe_allow_html=True,
         )
 
-    c1, c2 = st.columns([1, 3])
-    with c1:
+    # 主操作按钮 — 居中突出
+    c_l, c_m, c_r = st.columns([1, 2, 1])
+    with c_m:
         btn = st.button(
-            "🔄 计算分析" if not st.session_state.computed else "🔄 重新计算",
+            "🚀  计算分析" if not st.session_state.computed else "🔄  重新计算分析",
             type="primary",
             use_container_width=True,
         )
@@ -1032,22 +1147,43 @@ def tab_export(ap: Airport):
 # 主函数
 # ═══════════════════════════════════════════════════════════
 def main():
-    # 标题
+    # 标题 (含右上角作者+版本徽标)
     st.markdown(
-        '<div class="main-header">'
-        "<h1>✈ 机场障碍物对飞行影响分析系统</h1>"
-        "<p>AIRPORT OBSTACLE IMPACT ANALYSIS SYSTEM · ICAO Annex 14 / PANS-OPS</p>"
-        "</div>",
+        f"""
+<div class="main-header">
+    <div class="header-meta">
+        <div class="badge-version">{APP_VERSION}</div>
+        <div class="credit-author">程序设计：{AUTHOR}</div>
+        <div class="credit-tech">技术支持：{TECH_SUPPORT}</div>
+    </div>
+    <h1>✈ 机场障碍物对飞行影响分析系统</h1>
+    <p>AIRPORT OBSTACLE IMPACT ANALYSIS SYSTEM · ICAO Annex 14 / PANS-OPS</p>
+</div>
+""",
         unsafe_allow_html=True,
     )
 
     st.markdown(
-        '<div class="panel">'
-        '<div class="panel-title">操作流程 / WORKFLOW</div>'
-        '<div class="quick-guide">'
-        '① 导入文件 → ② 核对机场与跑道信息 → ③ 设置离场参数 → ④ 计算并导出结果'
-        '</div>'
-        '</div>',
+        """
+<div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; margin: 6px 0 14px 0;">
+  <div class="step-card">
+    <div class="step-head"><div class="step-badge">1</div><div class="step-title">导入数据</div></div>
+    <div class="step-desc">在左侧上传 <b>AIP PDF</b> 或 <b>AIP TXT</b> 原始数据文件，系统自动识别并解析。</div>
+  </div>
+  <div class="step-card">
+    <div class="step-head"><div class="step-badge">2</div><div class="step-title">核对信息</div></div>
+    <div class="step-desc">查看「机场信息」「跑道/QFU」「障碍物」页签，按需直接在表格中修正。</div>
+  </div>
+  <div class="step-card">
+    <div class="step-head"><div class="step-badge">3</div><div class="step-title">设置离场</div></div>
+    <div class="step-desc">在「离场参数」页签为各 QFU 配置离场转弯角和坐标偏移。</div>
+  </div>
+  <div class="step-card">
+    <div class="step-head"><div class="step-badge">4</div><div class="step-title">计算导出</div></div>
+    <div class="step-desc">进入「导出」页签点击 <b>计算分析</b>，下载 <b>XLSX + TXT</b> 报告。</div>
+  </div>
+</div>
+""",
         unsafe_allow_html=True,
     )
 

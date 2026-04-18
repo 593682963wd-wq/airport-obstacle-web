@@ -85,38 +85,67 @@ def generate_xlsx(airport: Airport, filepath: str,
 
 
 def _apply_center_and_autofit(ws, center_align: Alignment):
-    """对sheet应用居中对齐和自适应列宽"""
+    """对 sheet 应用水平+垂直居中、强制自动换行、列宽自适应、行高自适应。
+
+    UI 优化要点 (v1.1.0):
+    - 所有单元格强制 wrap_text=True, 避免长文本被截断;
+    - 列宽上限提升到 60 (中文字符按 2 计);
+    - 估算多行后, 行高按 max(15 × 行数, 18) 自动放大, 防止文字被遮挡。
+    """
     col_max_width: dict[int, float] = {}
+    row_max_lines: dict[int, int] = {}
+
     for row in ws.iter_rows():
         for cell in row:
-            # 居中对齐(保留已有的wrap_text设置)
-            existing = cell.alignment
+            # 强制水平+垂直居中, 强制自动换行
             cell.alignment = Alignment(
                 horizontal="center",
                 vertical="center",
-                wrap_text=existing.wrap_text if existing else False,
+                wrap_text=True,
             )
-            # 计算列宽
-            if cell.value is not None:
-                val_str = str(cell.value)
-                # 对公式取一个合理默认宽度
-                if val_str.startswith("="):
-                    char_len = 12
-                else:
-                    # 取最长行的字符数, 中文字符算2
-                    lines = val_str.split("\n")
-                    char_len = 0
-                    for line in lines:
-                        line_len = sum(2 if ord(c) > 127 else 1 for c in line)
-                        char_len = max(char_len, line_len)
-                col = cell.column
-                col_max_width[col] = max(col_max_width.get(col, 0), char_len)
+            if cell.value is None:
+                continue
+            val_str = str(cell.value)
+            # 公式给一个合理默认宽度即可
+            if val_str.startswith("="):
+                char_len = 12
+                line_count = 1
+            else:
+                lines = val_str.split("\n")
+                line_count = len(lines)
+                # 列宽按单行最长计算, 中文字符按 2 计
+                char_len = 0
+                for line in lines:
+                    line_len = sum(2 if ord(c) > 127 else 1 for c in line)
+                    char_len = max(char_len, line_len)
+            col = cell.column
+            col_max_width[col] = max(col_max_width.get(col, 0), char_len)
+            r = cell.row
+            row_max_lines[r] = max(row_max_lines.get(r, 1), line_count)
 
+    # 列宽: 加 padding, 最小 10, 最大 60 (放大上限避免折断关键列)
     for col_idx, width in col_max_width.items():
         col_letter = get_column_letter(col_idx)
-        # 加一点padding, 最小8, 最大50
-        adjusted = min(max(width + 3, 8), 50)
+        adjusted = min(max(width + 4, 10), 60)
         ws.column_dimensions[col_letter].width = adjusted
+
+    # 行高: 按单元格里实际折行数估算 (\n 明文换行 + 超列宽自动折行)
+    for r, base_lines in row_max_lines.items():
+        wrapped = base_lines
+        for c_idx, col_w in col_max_width.items():
+            cell = ws.cell(row=r, column=c_idx)
+            if cell.value is None:
+                continue
+            text = str(cell.value)
+            if text.startswith("="):
+                continue
+            # 实际列宽 (上限 60)
+            actual_w = min(max(col_w + 4, 10), 60)
+            for line in text.split("\n"):
+                line_w = sum(2 if ord(c) > 127 else 1 for c in line)
+                if line_w > actual_w:
+                    wrapped = max(wrapped, base_lines + (line_w // actual_w))
+        ws.row_dimensions[r].height = max(18, wrapped * 16)
 
 
 # ── 跑道数据页 ──────────────────────────────
