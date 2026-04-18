@@ -76,12 +76,13 @@ def _qfu_block(lines: list[str], qfu: QFU, ap: Airport):
     _field(lines, 3, "GroovedPFCStopway", GROOVED_PFC_STOPWAY)
     _field(lines, 3, "RunwayPavement", RUNWAY_PAVEMENT)
     _field(lines, 3, "GroovedPFCSurfaceLD", GROOVED_PFC_SURFACE_LD)
-    _field(lines, 3, "TOComments", "")
-    _field(lines, 3, "LDComments", "")
+    _field(lines, 3, "TOComments", qfu.to_comments)
+    _field(lines, 3, "LDComments", qfu.ld_comments)
     _field(lines, 3, "LastUpdate", qfu.last_update)
     _field(lines, 3, "GAMethodFlag", qfu.ga_method_flag)
     _field(lines, 3, "ApproachSlope",
-           qfu.approach_slope if qfu.approach_slope is not None else APPROACH_SLOPE)
+           qfu.approach_slope if qfu.approach_slope is not None else
+           (APPROACH_SLOPE if qfu.ga_method_flag == 0 else ""))
     _field(lines, 3, "IncrementGAHeight",
            qfu.increment_ga_height if qfu.ga_method_flag == 0 and qfu.increment_ga_height is not None else
            (INCREMENT_GA_HEIGHT if qfu.ga_method_flag == 0 else ""))

@@ -166,6 +166,10 @@ def _parse_qfu_block(lines: list[str], idx: int, qfu: QFU, airport: Airport) -> 
                 qfu.increment_ga_height = _float(v)
         elif k == 'LastUpdate':
             qfu.last_update = v
+        elif k == 'TOComments':
+            qfu.to_comments = v
+        elif k == 'LDComments':
+            qfu.ld_comments = v
         elif k == 'EntryLastUpdate':
             qfu.entry_last_update = v
         elif k == 'MagneticHeading':

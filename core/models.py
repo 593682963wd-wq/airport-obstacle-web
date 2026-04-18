@@ -61,6 +61,10 @@ class QFU:
     # 障碍物分析结果
     obstacle_results: list[ObstacleResult] = field(default_factory=list)
 
+    # 起降备注
+    to_comments: str = ""       # TOComments
+    ld_comments: str = ""       # LDComments
+
     # 日期
     last_update: str = ""       # YYYYMMDD
     entry_last_update: str = ""
