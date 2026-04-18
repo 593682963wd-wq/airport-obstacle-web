@@ -55,6 +55,24 @@ def parse_aip_pdf(filepath: str) -> Airport:
                 if qfu.glide_slope is None:
                     qfu.glide_slope = -3
 
+    # 根据入口标高差计算有效坡度(对多段坡度场景更准确, 保证同跑道两端坡度互为相反数)
+    for rwy in airport.runways:
+        mains = rwy.main_qfus
+        if len(mains) == 2 and rwy.max_length > 0:
+            t0 = mains[0].threshold_elevation
+            t1 = mains[1].threshold_elevation
+            if t0 > 0 and t1 > 0:
+                eff_slope = round((t1 - t0) / rwy.max_length * 100, 2)
+                mains[0].slope = eff_slope
+                mains[1].slope = -eff_slope
+                # 同步交叉起飞点坡度
+                for iq in rwy.intersection_qfus:
+                    parent_ident = iq.ident.split()[0] if " " in iq.ident else iq.ident
+                    if parent_ident == mains[0].ident:
+                        iq.slope = mains[0].slope
+                    elif parent_ident == mains[1].ident:
+                        iq.slope = mains[1].slope
+
     return airport
 
 
@@ -356,6 +374,7 @@ def _parse_ad213(airport: Airport, tables: list):
                             tora=tora, toda=toda, asda=asda, lda=lda,
                             slope=parent.slope,
                             threshold_elevation=parent.threshold_elevation,
+                            magnetic_heading=parent.magnetic_heading,
                             glide_slope=parent.glide_slope,
                             is_intersection=True,
                         )
@@ -366,10 +385,33 @@ def _parse_ad213(airport: Airport, tables: list):
                 for rwy in airport.runways:
                     for qfu in rwy.qfus:
                         if qfu.ident == rwy_id and not qfu.is_intersection:
-                            qfu.tora = tora
-                            qfu.toda = toda
-                            qfu.asda = asda
-                            qfu.lda = lda
+                            # 安全检查: 如已有距离且TORA不同, 可能是未识别的交叉起飞点
+                            if qfu.tora > 0 and tora != qfu.tora:
+                                full_row_text = _row_text(row)
+                                if '进入' in full_row_text:
+                                    m_inter = re.search(
+                                        r'[由从]\s*([A-Za-z0-9/、，,]+)\s*进入',
+                                        full_row_text)
+                                    inter_name = m_inter.group(1) if m_inter else ""
+                                    inter_name = inter_name.replace(
+                                        '、', '/').replace('，', '/').replace(',', '/')
+                                    ident = f"{rwy_id} {inter_name}" if inter_name else rwy_id
+                                    new_qfu = QFU(
+                                        ident=ident,
+                                        tora=tora, toda=toda, asda=asda, lda=lda,
+                                        slope=qfu.slope,
+                                        threshold_elevation=qfu.threshold_elevation,
+                                        magnetic_heading=qfu.magnetic_heading,
+                                        glide_slope=qfu.glide_slope,
+                                        is_intersection=True,
+                                    )
+                                    rwy.qfus.append(new_qfu)
+                                # 无"进入"关键字且TORA不同时不覆盖, 避免误修改
+                            else:
+                                qfu.tora = tora
+                                qfu.toda = toda
+                                qfu.asda = asda
+                                qfu.lda = lda
                             break
                     else:
                         continue
@@ -383,8 +425,9 @@ def _parse_ad210(airport: Airport, tables: list):
     for table in tables:
         if not table or len(table) < 3:
             continue
-        # 障碍物表特征: 6列, 前几行含"障碍物"和"磁方位"
-        if len(table[0]) != 6:
+        # 放宽列数限制: 允许4-10列(兼容PDF提取的列数差异)
+        ncols = len(table[0])
+        if ncols < 4 or ncols > 10:
             continue
         first_rows = " ".join(
             _row_text(table[i]) for i in range(min(3, len(table))))
@@ -396,43 +439,60 @@ def _parse_ad210(airport: Airport, tables: list):
         for row in table:
             if not row or len(row) < 4:
                 continue
-            name_cell = _cs(row[0])
-            pos_cell = _cs(row[2])
 
-            # 数据行: 位置列含"磁方位/距离"格式 (如 "002/2634")
-            m_pos = re.search(r'(\d{1,3})\s*/\s*(\d+)', pos_cell)
+            # 动态查找包含 "磁方位/距离" 格式的列 (如 "002/2634")
+            m_pos = None
+            pos_col_idx = -1
+            for ci in range(len(row)):
+                candidate = _cs(row[ci])
+                m = re.search(r'(\d{1,3})\s*/\s*(\d+)', candidate)
+                if m:
+                    m_pos = m
+                    pos_col_idx = ci
+                    break
+
             if not m_pos:
                 continue
 
             bearing = int(m_pos.group(1))
             distance = int(m_pos.group(2))
 
-            # 序号: 名称单元格末尾独立的3位数字行
+            # 名称: 位置列之前所有列合并
+            name_cell = _cs(row[0])
+            if pos_col_idx > 1:
+                name_cell = ' '.join(
+                    _cs(row[c]) for c in range(pos_col_idx) if c < len(row))
+
+            # 序号: 名称单元格末尾独立的1-3位数字行
             actual_seq = 0
-            lines = name_cell.strip().split('\n')
-            for line in reversed(lines):
+            cell_lines = name_cell.strip().split('\n')
+            for line in reversed(cell_lines):
                 line = line.strip()
-                if re.match(r'^\d{3}$', line):
+                if re.match(r'^\d{1,3}$', line):
                     actual_seq = int(line)
                     break
 
             # 名称: 去掉末尾序号行, 拼接
             name_parts = []
-            for line in lines:
-                if re.match(r'^\d{3}$', line.strip()):
+            for line in cell_lines:
+                if re.match(r'^\d{1,3}$', line.strip()):
                     break
                 name_parts.append(line.strip())
             name = ''.join(name_parts)
 
-            # 标高(米)
-            elev_cell = _cs(row[3])
+            # 标高(米): 位置列之后的下一列
             elev = 0.0
-            m_elev = re.search(r'[\d.]+', elev_cell)
-            if m_elev:
-                elev = float(m_elev.group())
+            elev_col = pos_col_idx + 1
+            if elev_col < len(row):
+                elev_cell = _cs(row[elev_col])
+                m_elev = re.search(r'[\d.]+', elev_cell)
+                if m_elev:
+                    elev = float(m_elev.group())
 
-            # 控制障碍物/航段说明
-            ctrl = _cs(row[5]) if len(row) > 5 else ""
+            # 控制障碍物/航段说明: 最后一列(若在标高列之后还有)
+            ctrl = ""
+            if len(row) > elev_col + 1:
+                ctrl = _cs(row[-1])
 
             obs = Obstacle(
                 seq=actual_seq,

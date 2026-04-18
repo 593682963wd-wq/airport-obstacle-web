@@ -518,23 +518,143 @@ def welcome():
 
 
 # ═══════════════════════════════════════════════════════════
+# 数据同步辅助函数 (data_editor → 模型对象)
+# ═══════════════════════════════════════════════════════════
+def _safe_int(v, d=0):
+    """安全转换为int"""
+    if v is None:
+        return d
+    try:
+        f = float(v)
+        return d if math.isnan(f) else int(f)
+    except (ValueError, TypeError):
+        return d
+
+
+def _safe_float(v, d=0.0):
+    """安全转换为float"""
+    if v is None:
+        return d
+    try:
+        f = float(v)
+        return d if math.isnan(f) else f
+    except (ValueError, TypeError):
+        return d
+
+
+def _sync_qfus(rwy, edited_df):
+    """将编辑后的QFU DataFrame同步回Runway.qfus"""
+    orig_count = len(rwy.qfus)
+    new_qfus = []
+    for idx, row in edited_df.iterrows():
+        ident = str(row.get("方向", "")).strip()
+        if not ident:
+            continue
+        mh = _safe_int(row.get("磁方位°"))
+        tora = _safe_int(row.get("TORA"))
+        toda = _safe_int(row.get("TODA"))
+        asda = _safe_int(row.get("ASDA"))
+        lda = _safe_int(row.get("LDA"))
+        te = _safe_float(row.get("入口标高m"))
+        slope = _safe_float(row.get("坡度%"))
+        gs_raw = _safe_float(row.get("GlideSlope"))
+        gs_val = gs_raw if gs_raw != 0.0 else None
+        is_inter = bool(row.get("交叉起飞点", False))
+
+        if 0 <= idx < orig_count:
+            q = rwy.qfus[idx]
+            q.ident, q.magnetic_heading = ident, mh
+            q.tora, q.toda, q.asda, q.lda = tora, toda, asda, lda
+            q.threshold_elevation, q.slope = te, slope
+            q.glide_slope = gs_val
+            q.ga_method_flag = 0 if gs_val else 1
+            q.is_intersection = is_inter
+            new_qfus.append(q)
+        else:
+            new_qfus.append(QFU(
+                ident=ident, magnetic_heading=mh,
+                tora=tora, toda=toda, asda=asda, lda=lda,
+                threshold_elevation=te, slope=slope,
+                glide_slope=gs_val,
+                ga_method_flag=0 if gs_val else 1,
+                is_intersection=is_inter,
+            ))
+    rwy.qfus = new_qfus
+
+
+def _sync_obstacles(ap, edited_df):
+    """将编辑后的障碍物DataFrame同步回Airport.obstacles"""
+    orig_count = len(ap.obstacles)
+    new_obs = []
+    for idx, row in edited_df.iterrows():
+        name = str(row.get("名称", "") or "").strip()
+        seq = _safe_int(row.get("序号"))
+        dist = _safe_int(row.get("距离m"))
+        if not name and seq == 0 and dist == 0:
+            continue
+        bearing = _safe_int(row.get("磁方位°"))
+        elev = _safe_float(row.get("海拔m"))
+        coord = str(row.get("坐标", "") or "")
+        ctrl = str(row.get("控制障碍物", "") or "")
+        note = str(row.get("备注", "") or "")
+
+        if 0 <= idx < orig_count:
+            o = ap.obstacles[idx]
+            o.seq, o.name = seq, name
+            o.bearing, o.distance = bearing, dist
+            o.coordinate, o.elevation_m = coord, elev
+            o.remark_control, o.note = ctrl, note
+            new_obs.append(o)
+        else:
+            new_obs.append(Obstacle(
+                seq=seq or (len(new_obs) + 1),
+                name=name, bearing=bearing, distance=dist,
+                coordinate=coord, elevation_m=elev,
+                remark_control=ctrl, note=note,
+            ))
+    ap.obstacles = new_obs
+
+
+def _sync_results(qfu, edited_df):
+    """将编辑后的分析结果DataFrame同步回QFU.obstacle_results"""
+    for idx, row in edited_df.iterrows():
+        if idx >= len(qfu.obstacle_results):
+            break
+        r = qfu.obstacle_results[idx]
+        tag = str(row.get("判定", ""))
+        if "有效" in tag:
+            r.is_obstacle, r.is_shielded = True, False
+        elif "遮蔽" in tag:
+            r.is_obstacle, r.is_shielded = True, True
+        else:
+            r.is_obstacle, r.is_shielded = False, False
+        r.comment_label = str(row.get("标注", "") or "")
+
+
+# ═══════════════════════════════════════════════════════════
 # Tab 1: 机场信息
 # ═══════════════════════════════════════════════════════════
 def tab_airport(ap: Airport):
     st.markdown("### 机场基本信息")
+    iid = st.session_state.imp_id
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("ICAO", ap.icao or "—")
-    c2.metric("IATA", ap.iata or "—")
-    c3.metric("标高", f"{ap.elevation:.1f} m" if ap.elevation else "—")
-    c4.metric("磁差", ap.magnetic_variation or "—")
+    ap.icao = c1.text_input("ICAO", value=ap.icao or "", key=f"ap_icao_{iid}")
+    ap.iata = c2.text_input("IATA", value=ap.iata or "", key=f"ap_iata_{iid}")
+    ap.elevation = c3.number_input(
+        "标高(m)", value=float(ap.elevation or 0), step=0.1,
+        format="%.1f", key=f"ap_elev_{iid}")
+    ap.magnetic_variation = c4.text_input(
+        "磁差", value=ap.magnetic_variation or "", key=f"ap_magvar_{iid}")
 
     st.markdown("---")
     c1, c2 = st.columns(2)
-    c1.markdown(f"**名称** {ap.name}")
-    c1.markdown(f"**城市** {ap.city}")
-    c2.markdown(f"**数据日期** {ap.last_update}")
-    c2.markdown(f"**障碍物日期** {ap.obstacle_last_update}")
+    ap.name = c1.text_input("名称", value=ap.name or "", key=f"ap_name_{iid}")
+    ap.city = c1.text_input("城市", value=ap.city or "", key=f"ap_city_{iid}")
+    ap.last_update = c2.text_input(
+        "数据日期", value=ap.last_update or "", key=f"ap_lupd_{iid}")
+    ap.obstacle_last_update = c2.text_input(
+        "障碍物日期", value=ap.obstacle_last_update or "", key=f"ap_olupd_{iid}")
 
     st.markdown("---")
     st.markdown("### 📊 数据总览")
@@ -554,20 +674,28 @@ def tab_runway(ap: Airport):
     import pandas as pd
 
     st.markdown("### 跑道 / QFU 数据")
-    st.caption("蓝色 = 交叉起飞点 · 绿色 = ILS · 默认 = 标准方向")
+    st.caption("编辑表格可直接修改数据 · 点击表格下方 ➕ 可新增 QFU · GlideSlope 填0表示无ILS")
+    iid = st.session_state.imp_id
 
     for ri, rwy in enumerate(ap.runways):
-        with st.expander(
-            f"跑道 {ri+1} — 磁方位 {rwy.magnetic_heading}° · "
-            f"{rwy.max_length}m × {rwy.width}m",
-            expanded=True,
-        ):
+        with st.expander(f"跑道 {ri+1}", expanded=True):
+            c1, c2, c3, c4 = st.columns(4)
+            rwy.max_length = c1.number_input(
+                "长度(m)", value=rwy.max_length, step=1,
+                key=f"rwy_len_{ri}_{iid}")
+            rwy.width = c2.number_input(
+                "宽度(m)", value=rwy.width, step=1,
+                key=f"rwy_wid_{ri}_{iid}")
+            rwy.magnetic_heading = c3.number_input(
+                "跑道磁方位°", value=rwy.magnetic_heading, step=1,
+                key=f"rwy_mh_{ri}_{iid}")
+            rwy.strength = c4.text_input(
+                "PCN", value=rwy.strength or "",
+                key=f"rwy_pcn_{ri}_{iid}")
+
+            st.markdown("**QFU 方向数据**")
             rows = []
             for q in rwy.qfus:
-                kind = (
-                    "交叉起飞点" if q.is_intersection
-                    else ("ILS" if q.ga_method_flag == 0 else "标准")
-                )
                 rows.append({
                     "方向": q.ident,
                     "磁方位°": q.magnetic_heading,
@@ -577,21 +705,31 @@ def tab_runway(ap: Airport):
                     "LDA": q.lda,
                     "入口标高m": round(q.threshold_elevation, 1),
                     "坡度%": round(q.slope, 2),
-                    "净空道m": q.clearway,
-                    "GlideSlope": q.glide_slope if q.glide_slope else "—",
-                    "类型": kind,
+                    "GlideSlope": q.glide_slope if q.glide_slope is not None else 0.0,
+                    "交叉起飞点": q.is_intersection,
                 })
-            df = pd.DataFrame(rows)
+            df = pd.DataFrame(rows) if rows else pd.DataFrame(
+                columns=["方向", "磁方位°", "TORA", "TODA", "ASDA", "LDA",
+                         "入口标高m", "坡度%", "GlideSlope", "交叉起飞点"])
 
-            def _color(row):
-                if row["类型"] == "交叉起飞点":
-                    return ["background-color:#283C50; color:#c0d8f0"] * len(row)
-                if row["类型"] == "ILS":
-                    return ["background-color:#143C28; color:#a0d8b0"] * len(row)
-                return ["background-color:#0F1928; color:#c0d8f0"] * len(row)
+            edited_df = st.data_editor(
+                df,
+                num_rows="dynamic",
+                use_container_width=True,
+                hide_index=True,
+                key=f"qfu_edit_{ri}_{iid}",
+                column_config={
+                    "GlideSlope": st.column_config.NumberColumn(
+                        "GlideSlope", help="ILS下滑角(如-3)，无ILS填0",
+                        format="%.1f"),
+                    "坡度%": st.column_config.NumberColumn(
+                        "坡度%", format="%.2f"),
+                    "入口标高m": st.column_config.NumberColumn(
+                        "入口标高m", format="%.1f"),
+                },
+            )
 
-            st.dataframe(df.style.apply(_color, axis=1),
-                         use_container_width=True, hide_index=True)
+            _sync_qfus(rwy, edited_df)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -601,9 +739,8 @@ def tab_obstacle(ap: Airport):
     import pandas as pd
 
     st.markdown("### 障碍物数据 (AD 2.10)")
-    if not ap.obstacles:
-        st.warning("暂无障碍物数据")
-        return
+    st.caption("编辑表格可直接修改数据 · 点击表格下方 ➕ 可新增障碍物")
+    iid = st.session_state.imp_id
 
     rows = []
     for o in ap.obstacles:
@@ -617,7 +754,22 @@ def tab_obstacle(ap: Airport):
             "控制障碍物": o.remark_control,
             "备注": o.note,
         })
-    st.dataframe(rows, use_container_width=True, hide_index=True, height=450)
+    df = pd.DataFrame(rows) if rows else pd.DataFrame(
+        columns=["序号", "名称", "磁方位°", "距离m", "坐标", "海拔m", "控制障碍物", "备注"])
+
+    edited_df = st.data_editor(
+        df,
+        num_rows="dynamic",
+        use_container_width=True,
+        hide_index=True,
+        height=450,
+        key=f"obs_edit_{iid}",
+        column_config={
+            "海拔m": st.column_config.NumberColumn("海拔m", format="%.1f"),
+        },
+    )
+
+    _sync_obstacles(ap, edited_df)
     st.caption(f"共 {len(ap.obstacles)} 个障碍物")
 
 
@@ -710,10 +862,13 @@ def tab_results(ap: Airport):
     import pandas as pd
 
     st.markdown("### 分析结果")
+    st.caption("可修改「判定」和「标注」列 · 修改后导出文件将反映更改")
 
     if not st.session_state.computed:
         st.info("⏳ 请先在「💾 导出」页签点击 **计算分析** 按钮")
         return
+
+    iid = st.session_state.imp_id
 
     for rwy in ap.runways:
         for qfu in rwy.qfus:
@@ -744,15 +899,22 @@ def tab_results(ap: Airport):
 
                 df = pd.DataFrame(rows)
 
-                def _c(row):
-                    if "有效" in str(row["判定"]):
-                        return ["background-color:#501E1E; color:#ff8a80"] * len(row)
-                    if "遮蔽" in str(row["判定"]):
-                        return ["background-color:#282828; color:#999"] * len(row)
-                    return ["background-color:#0F1E32; color:#80b8d8"] * len(row)
+                edited_df = st.data_editor(
+                    df,
+                    use_container_width=True,
+                    hide_index=True,
+                    key=f"res_{qfu.ident}_{iid}",
+                    column_config={
+                        "判定": st.column_config.SelectboxColumn(
+                            "判定",
+                            options=["🔴 有效障碍物", "⚪ 被遮蔽", "🔵 非障碍物"],
+                            required=True,
+                        ),
+                    },
+                    disabled=["序号", "名称", "DIST(m)", "HT(m)", "HT(ft)"],
+                )
 
-                st.dataframe(df.style.apply(_c, axis=1),
-                             use_container_width=True, hide_index=True)
+                _sync_results(qfu, edited_df)
 
                 eff = sum(1 for r in qfu.obstacle_results if r.is_obstacle and not r.is_shielded)
                 shd = sum(1 for r in qfu.obstacle_results if r.is_obstacle and r.is_shielded)

@@ -271,11 +271,10 @@ def _parse_ad213(airport: Airport, text: str):
                         tora=tora, toda=toda, asda=asda, lda=lda,
                         slope=parent.slope,
                         threshold_elevation=parent.threshold_elevation,
+                        magnetic_heading=parent.magnetic_heading,
                         glide_slope=parent.glide_slope,
                         is_intersection=True,
                     )
-                    # 交叉起飞点继承父QFU的磁方位(用于geometry计算)
-                    new_qfu.parent_magnetic_heading = parent.magnetic_heading
                     rwy.qfus.append(new_qfu)
                     break
         else:

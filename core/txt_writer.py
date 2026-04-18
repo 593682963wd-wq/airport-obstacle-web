@@ -45,7 +45,7 @@ def _runway_block(lines: list[str], rwy: Runway, ap: Airport):
     _field(lines, 2, "Strength", rwy.strength)
     _field(lines, 2, "MaxLength", rwy.max_length)
     _field(lines, 2, "Width", rwy.width)
-    _field(lines, 2, "Shoulder", rwy.shoulder)
+    _field(lines, 2, "Shoulder", "")
     _field(lines, 2, "Comments", rwy.comments)
     _field(lines, 2, "LastUpdate", rwy.last_update)
 
