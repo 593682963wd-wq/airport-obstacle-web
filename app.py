@@ -100,34 +100,36 @@ st.markdown(
         top: 6px;
         right: 8px;
         text-align: right;
-        line-height: 1.45;
+        line-height: 1.55;
     }
     .header-meta .badge-version {
         display: inline-block;
-        background: var(--panel-strong);
+        background: transparent;
         color: #50fa7b;
         border: 1px solid #50fa7b;
         border-radius: 12px;
-        padding: 1px 10px;
-        font-size: 0.72rem;
+        padding: 2px 14px;
+        font-size: 0.78rem;
         font-weight: 700;
         font-family: "Menlo", monospace;
-        letter-spacing: 0.5px;
-        margin-bottom: 4px;
+        letter-spacing: 1px;
+        margin-bottom: 12px;
     }
-    .header-meta .credit-author {
-        color: #ff79c6;
-        font-size: 0.74rem;
+    .header-meta table.credits {
+        margin-left: auto;
+        border-collapse: collapse;
+    }
+    .header-meta table.credits td {
+        color: #4fc3f7;
+        font-size: 0.78rem;
         font-weight: 700;
-        letter-spacing: 0.5px;
-        margin: 1px 0;
+        font-family: "Menlo", monospace;
+        letter-spacing: 1px;
+        padding: 2px 0;
     }
-    .header-meta .credit-tech {
-        color: #bd93f9;
-        font-size: 0.74rem;
-        font-weight: 700;
-        letter-spacing: 0.5px;
-    }
+    .header-meta table.credits td.t-label { text-align: right; padding-right: 2px; }
+    .header-meta table.credits td.t-colon { text-align: center; padding: 0 2px; }
+    .header-meta table.credits td.t-name  { text-align: left;  padding-left: 2px; }
     .panel {
         background: var(--panel);
         border: 1px solid var(--line);
@@ -560,7 +562,7 @@ def sidebar():
         st.markdown("---")
         st.markdown(
             f'<p class="footer-credit">'
-            f"{APP_VERSION} · 程序设计：{AUTHOR} · 技术支持：{TECH_SUPPORT}</p>",
+            f"{APP_VERSION} · 开发设计：{AUTHOR} · 技术支持：{TECH_SUPPORT}</p>",
             unsafe_allow_html=True,
         )
 
@@ -1153,8 +1155,18 @@ def main():
 <div class="main-header">
     <div class="header-meta">
         <div class="badge-version">{APP_VERSION}</div>
-        <div class="credit-author">程序设计：{AUTHOR}</div>
-        <div class="credit-tech">技术支持：{TECH_SUPPORT}</div>
+        <table class="credits">
+            <tr>
+                <td class="t-label">开发设计</td>
+                <td class="t-colon">：</td>
+                <td class="t-name">{AUTHOR}</td>
+            </tr>
+            <tr>
+                <td class="t-label">技术支持</td>
+                <td class="t-colon">：</td>
+                <td class="t-name">{TECH_SUPPORT}</td>
+            </tr>
+        </table>
     </div>
     <h1>✈ 机场障碍物对飞行影响分析系统</h1>
     <p>AIRPORT OBSTACLE IMPACT ANALYSIS SYSTEM · ICAO Annex 14 / PANS-OPS</p>
