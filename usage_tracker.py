@@ -45,6 +45,8 @@ def _cfg(key: str, default: str = "") -> str:
 
 ADMIN_TOKEN = _cfg("TRACKER_TOKEN", "amanda2026")
 FEISHU_WEBHOOK = _cfg("TRACKER_FEISHU_WEBHOOK", "")
+WECOM_WEBHOOK = _cfg("TRACKER_WECOM_WEBHOOK", "")  # 企业微信群机器人
+BARK_URL = _cfg("TRACKER_BARK_URL", "")  # 形如 https://api.day.app/<your_key>
 LOG_PATH = Path(_cfg("TRACKER_LOG_PATH", "/tmp/airport_obstacle_usage.jsonl"))
 CST = timezone(timedelta(hours=8))
 
@@ -105,25 +107,48 @@ def _write_log(record: dict[str, Any]) -> None:
 
 
 def _post_feishu_async(text: str) -> None:
-    """异步推送飞书，不阻塞页面。"""
-    if not FEISHU_WEBHOOK:
+    """异步推送飞书/企微/Bark，不阻塞页面。"""
+    if not (FEISHU_WEBHOOK or WECOM_WEBHOOK or BARK_URL):
         return
 
     def _send():
-        try:
-            payload = json.dumps(
-                {"msg_type": "text", "content": {"text": text}},
-                ensure_ascii=False,
-            ).encode("utf-8")
-            req = urlrequest.Request(
-                FEISHU_WEBHOOK,
-                data=payload,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            urlrequest.urlopen(req, timeout=4).read()
-        except (urlerror.URLError, Exception):
-            pass
+        # 飞书
+        if FEISHU_WEBHOOK:
+            try:
+                payload = json.dumps(
+                    {"msg_type": "text", "content": {"text": text}},
+                    ensure_ascii=False,
+                ).encode("utf-8")
+                req = urlrequest.Request(
+                    FEISHU_WEBHOOK, data=payload,
+                    headers={"Content-Type": "application/json"}, method="POST",
+                )
+                urlrequest.urlopen(req, timeout=4).read()
+            except Exception:
+                pass
+        # 企业微信
+        if WECOM_WEBHOOK:
+            try:
+                payload = json.dumps(
+                    {"msgtype": "text", "text": {"content": text}},
+                    ensure_ascii=False,
+                ).encode("utf-8")
+                req = urlrequest.Request(
+                    WECOM_WEBHOOK, data=payload,
+                    headers={"Content-Type": "application/json"}, method="POST",
+                )
+                urlrequest.urlopen(req, timeout=4).read()
+            except Exception:
+                pass
+        # Bark (iOS 推送)
+        if BARK_URL:
+            try:
+                from urllib.parse import quote
+                title = "障碍物分析访问"
+                url = f"{BARK_URL.rstrip('/')}/{quote(title)}/{quote(text[:300])}"
+                urlrequest.urlopen(url, timeout=4).read()
+            except Exception:
+                pass
 
     threading.Thread(target=_send, daemon=True).start()
 
@@ -213,8 +238,13 @@ def maybe_render_admin() -> bool:
 
     # ── 管理员视图 ──
     st.markdown("## 🔒 访问追踪面板（仅作者可见）")
+    pushers = []
+    if FEISHU_WEBHOOK: pushers.append("飞书")
+    if WECOM_WEBHOOK: pushers.append("企微")
+    if BARK_URL: pushers.append("Bark")
+    push_status = "、".join(pushers) if pushers else "未配置（只靠本页查看）"
     st.caption(
-        f"日志文件：`{LOG_PATH}`　飞书推送：{'✅ 已配置' if FEISHU_WEBHOOK else '❌ 未配置'}"
+        f"日志文件：`{LOG_PATH}`　推送通道：{push_status}"
     )
 
     logs = _read_logs(limit=1000)
