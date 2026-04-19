@@ -459,6 +459,13 @@ def _parse_ad210(airport: Airport, tables: list):
                     actual_seq = int(line)
                     break
 
+            # 回退1: 单独尝试第0列(典型 "序号" 列)
+            if actual_seq == 0 and pos_col_idx > 0:
+                col0_text = _cs(row[0]).strip()
+                m_seq0 = re.match(r'^\s*(\d{1,3})\s*$', col0_text)
+                if m_seq0:
+                    actual_seq = int(m_seq0.group(1))
+
             # 名称: 去掉末尾序号行, 拼接
             name_parts = []
             for line in cell_lines:
@@ -490,7 +497,10 @@ def _parse_ad210(airport: Airport, tables: list):
                 remark_control=ctrl,
             )
             airport.obstacles.append(obs)
-
+    # 最终兑底: 任何未识别序号的障碍物按顺序赋 1, 2, 3...
+    for i, obs in enumerate(airport.obstacles):
+        if obs.seq == 0:
+            obs.seq = i + 1
 
 # ── 工具函数 ──────────────────────────────
 

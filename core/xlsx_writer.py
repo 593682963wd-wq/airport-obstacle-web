@@ -244,7 +244,7 @@ def _build_runway_data_sheet(ws, airport: Airport, qfu_headings: dict):
                         ws.cell(row=data_row, column=2).value = f"={sn}!S{dir_row}"
                         ws.cell(row=data_row, column=3).value = f"={sn}!T{dir_row}"
                         ws.cell(row=data_row, column=4).value = \
-                            f"=ROUND({sn}!T{dir_row}*{M_TO_FT},0)"
+                            f"=CEILING({sn}!T{dir_row}*{M_TO_FT},1)"
                         ws.cell(row=data_row, column=5).value = \
                             f"=IF({sn}!S{dir_row}>0,{sn}!T{dir_row}/{sn}!S{dir_row},\"\")"
                     else:
@@ -252,13 +252,13 @@ def _build_runway_data_sheet(ws, airport: Airport, qfu_headings: dict):
                         ws.cell(row=data_row, column=2, value=obs_r.dist_from_end)
                         ws.cell(row=data_row, column=3, value=obs_r.ht_above_end)
                         ws.cell(row=data_row, column=4,
-                                value=round(obs_r.ht_above_end * M_TO_FT))
+                                value=math.ceil(obs_r.ht_above_end * M_TO_FT))
                         if obs_r.dist_from_end > 0:
                             ws.cell(row=data_row, column=5,
                                     value=obs_r.ht_above_end / obs_r.dist_from_end)
 
-                    # F: 标注(序号 + A标签)
-                    ws.cell(row=data_row, column=6, value=obs_r.comment_label)
+                    # F: 标注(只保留序号, 不含 A1-* 后缀)
+                    ws.cell(row=data_row, column=6, value=obs_r.obstacle.seq)
                     # G: 被遮蔽标记
                     if obs_r.is_shielded:
                         ws.cell(row=data_row, column=7, value="被遮蔽")
@@ -277,7 +277,7 @@ def _build_runway_data_sheet(ws, airport: Airport, qfu_headings: dict):
                     ws.cell(row=data_row, column=3).value = \
                         f'=IF({sn}!K{dir_row}="是",{sn}!T{dir_row},"")'
                     ws.cell(row=data_row, column=4).value = \
-                        f'=IF({sn}!K{dir_row}="是",ROUND({sn}!T{dir_row}*{M_TO_FT},0),"")'
+                        f'=IF({sn}!K{dir_row}="是",CEILING({sn}!T{dir_row}*{M_TO_FT},1),"")'
                     ws.cell(row=data_row, column=5).value = \
                         f'=IF(AND({sn}!K{dir_row}="是",{sn}!S{dir_row}>0),' \
                         f'{sn}!T{dir_row}/{sn}!S{dir_row},"")'
