@@ -220,6 +220,82 @@ def track_visit_once() -> None:
 # ─────────────────────────────────────────────
 # 隐藏管理员页
 # ─────────────────────────────────────────────
+def _friendly_ua(ua: str) -> str:
+    """把浏览器 User-Agent 翻译成『iPhone · Safari』这种大白话。"""
+    if not ua or ua == "?":
+        return "未知设备"
+    s = ua
+    sl = s.lower()
+
+    # 设备/系统
+    if "iphone" in sl:
+        device = "iPhone"
+    elif "ipad" in sl:
+        device = "iPad"
+    elif "android" in sl:
+        # 尝试拿型号
+        import re
+        m = re.search(r"\(linux;[^)]*android[^;]*;\s*([^;)]+)", sl)
+        device = "Android · " + m.group(1).strip().title() if m else "Android 手机"
+    elif "macintosh" in sl or "mac os x" in sl:
+        device = "Mac 电脑"
+    elif "windows nt 10" in sl or "windows nt 11" in sl:
+        device = "Windows 电脑"
+    elif "windows" in sl:
+        device = "Windows 电脑"
+    elif "linux" in sl:
+        device = "Linux 电脑"
+    else:
+        device = "其他设备"
+
+    # 浏览器（顺序很重要：Edge 含 Chrome、微信含 Safari…）
+    if "micromessenger" in sl:
+        browser = "微信"
+    elif "wxwork" in sl:
+        browser = "企业微信"
+    elif "lark" in sl or "feishu" in sl:
+        browser = "飞书"
+    elif "dingtalk" in sl:
+        browser = "钉钉"
+    elif "qqbrowser" in sl:
+        browser = "QQ 浏览器"
+    elif "ucbrowser" in sl or "ucweb" in sl:
+        browser = "UC 浏览器"
+    elif "edg/" in sl or "edge" in sl:
+        browser = "Edge"
+    elif "opr/" in sl or "opera" in sl:
+        browser = "Opera"
+    elif "firefox" in sl:
+        browser = "Firefox"
+    elif "chrome" in sl:
+        browser = "Chrome"
+    elif "safari" in sl:
+        browser = "Safari"
+    else:
+        browser = "其他浏览器"
+
+    return f"{device} · {browser}"
+
+
+def _build_visitor_codes(logs: list[dict[str, Any]]) -> dict[str, str]:
+    """
+    给每个 IP 一个稳定的代号：访客 #01、访客 #02……
+    按"第一次出现的时间"排序，所以同一个 IP 永远是同一个号。
+    """
+    seen: dict[str, str] = {}
+    counter = 1
+    # 日志已经是按时间顺序写的（追加），所以正向遍历即为首次出现序
+    for r in logs:
+        ip = r.get("ip", "")
+        if not ip or ip == "?":
+            continue
+        if ip in seen:
+            continue
+        seen[ip] = f"访客 #{counter:02d}"
+        counter += 1
+    return seen
+
+
 def _read_logs(limit: int = 500) -> list[dict[str, Any]]:
     if not LOG_PATH.exists():
         return []
@@ -266,6 +342,15 @@ def maybe_render_admin() -> bool:
     if not logs:
         st.info("📬 还没有人访问过。把网站地址发给同事让他们打开后，再回来这里看。")
         return True
+
+    # · 访客代号：基于全部历史日志生成（同一 IP 永远同代号）
+    visitor_codes = _build_visitor_codes(logs)
+
+    def _ip_label(ip: str) -> str:
+        if not ip or ip == "?":
+            return "未知"
+        code = visitor_codes.get(ip, "访客 #??")
+        return f"{code}　({ip})"
 
     # ─── 顶部筛选条 ───
     # 英文事件名 → 中文
@@ -338,20 +423,42 @@ def maybe_render_admin() -> bool:
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("👀 打开首页", visits)
     c2.metric("🧑 访客人次", sessions)
-    c3.metric("🌐 不同 IP", ips)
+    c3.metric(f"🌐 不同访客", ips, help="同一个 IP 算一个访客，代号不变")
     c4.metric("📤 上传文件", uploads)
     c5.metric("⬇️ 下载报告", exports)
 
-    # ─── IP 排行 ───
+    # ─── 访客名单（代号·IP·次数） ───
     if filtered:
         from collections import Counter
         ip_counter = Counter(
             r.get("ip", "?") for r in filtered if r.get("ip") not in (None, "?")
         )
         if ip_counter:
-            with st.expander(f"🏆 访问最多的上网 IP（共 {len(ip_counter)} 个）", expanded=False):
-                for ip, cnt in ip_counter.most_common(15):
-                    st.write(f"- `{ip}` — **{cnt}** 次")
+            st.markdown("### 🧑‍💻 访客名单（同一个代号永远是同一个人/公司）")
+            visitor_rows = []
+            for ip, cnt in ip_counter.most_common():
+                # 查该 IP 最常用的设备 + 最近一次访问
+                ua_counter = Counter(
+                    _friendly_ua(r.get("ua", "?")) for r in filtered if r.get("ip") == ip
+                )
+                last_time = max(
+                    (r.get("time", "") for r in filtered if r.get("ip") == ip),
+                    default="",
+                )
+                visitor_rows.append({
+                    "代号": visitor_codes.get(ip, "访客 #??"),
+                    "上网 IP": ip,
+                    "最常用设备": ua_counter.most_common(1)[0][0] if ua_counter else "未知",
+                    "访问次数": cnt,
+                    "最后一次来": last_time,
+                })
+            try:
+                import pandas as pd
+                st.dataframe(pd.DataFrame(visitor_rows), use_container_width=True, hide_index=True)
+            except Exception:
+                for v in visitor_rows:
+                    st.write(v)
+            st.caption("💡 同一个公司/家庭的多人可能共用一个公网 IP，会被记为同一个代号。")
 
     # ─── 完整事件表 ───
     st.markdown("### 📋 每一次活动明细（最新的在最上面）")
@@ -360,18 +467,16 @@ def maybe_render_admin() -> bool:
 
         rows = []
         for r in reversed(filtered):
+            ip = r.get("ip", "")
             rows.append({
                 "时间": r.get("time", ""),
+                "访客": visitor_codes.get(ip, "未知") if ip and ip != "?" else "未知",
                 "动作": _cn(r.get("event", "?")),
-                "访客 IP": r.get("ip", ""),
                 "机场代码": r.get("icao", ""),
                 "文件名": r.get("file", ""),
-                "文件大小(KB)": r.get("size_kb", ""),
                 "下载格式": r.get("fmt", ""),
-                "识别跳道": r.get("runways", ""),
-                "识别障碍物": r.get("obstacles", ""),
-                "浏览器语言": r.get("lang", ""),
-                "浏览器信息": r.get("ua", ""),
+                "设备": _friendly_ua(r.get("ua", "")),
+                "上网 IP": ip,
                 "会话 ID": r.get("session", ""),
             })
         df = pd.DataFrame(rows)
@@ -410,18 +515,30 @@ def maybe_render_admin() -> bool:
             pass
 
     st.divider()
-    with st.expander("ℹ️ 各列意思说明", expanded=False):
+    with st.expander("ℹ️ 各列意思说明（看不懂时点开）", expanded=False):
         st.markdown("""
-- **时间**：同事打开这个动作的北京时间
-- **动作**：
-  - 👀 访问首页 — 有人打开了工具网页
-  - 📤 上传文件 — 有人上传了 PDF、TXT 资料
-  - ⚙️ 运行计算 — 点击了「开始计算」按钮
-  - ⬇️ 下载报告 — 下载了 Excel 或 TXT 结果
-- **访客 IP**：同事上网的公网 IP，同一个公司会是同一个 IP
-- **机场代码**：他查的是哪个机场（如 ZBAA = 首都）
-- **会话 ID**：区分不同浏览器标签的随机编号
-- **浏览器信息**：可以看出是手机还是电脑、Chrome 还是 Safari
+**怎么看「访客」代号？**
+- `访客 #01`、`访客 #02` 是按**第一次来的先后**自动编号的
+- **同一个 IP 永远是同一个代号**，所以你看到 `访客 #03` 来过 5 次，就是同一个人/同一个公司
+- 如果同事在公司、家里、4G 切换上网，IP 会变 → 会被记成不同代号
+- 想给某个代号备注真实姓名？告诉我，我可以加备注功能
+
+**「动作」分别什么意思？**
+- 👀 **访问首页** — 有人打开了工具网页（不一定真的用了）
+- 📤 **上传文件** — 上传了 PDF / TXT 资料
+- ⚙️ **运行计算** — 点了「开始计算」按钮（真正在用）
+- ⬇️ **下载报告** — 下载了 Excel 或 TXT 结果（用完导出了）
+
+**「设备」一栏是什么意思？**
+- 比如 `iPhone · Safari` = 用 iPhone 自带浏览器打开的
+- `Windows 电脑 · Chrome` = 在公司电脑用 Chrome 打开的
+- `Mac 电脑 · 微信` = 在 Mac 上的微信里点开链接看
+- `Android · 钉钉` = 用安卓手机的钉钉打开的
+- 这样你能大致判断：是不是在公司用电脑工作时打开的、是不是手机随便看了下
+
+**「机场代码」**：他在查哪个机场，比如 ZBAA 是北京首都、ZUUU 是成都双流
+
+**「上网 IP」**：纯技术信息，对应「访客代号」用的，一般可以忽略
         """)
 
     st.caption(
