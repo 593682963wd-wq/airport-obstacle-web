@@ -8,3 +8,9 @@ dist/
 build/
 .venv/
 venv/
+
+# 私密：访问追踪相关
+_私密_*.md
+usage_log.jsonl
+*.usage_log.jsonl
+.streamlit/secrets.toml

@@ -19,6 +19,7 @@ from core.geometry import compute_obstacle_results, compute_ht_ft, apply_shieldi
 from core.xlsx_writer import generate_xlsx
 from core.txt_writer import write_txt, generate_txt
 from templates.constants import M_TO_FT
+from usage_tracker import track_visit_once, track_event, maybe_render_admin
 
 # ══════════════════════════════════════════════════════════════════
 # 版本号 — 语义化版本规则 (大厂通行: MAJOR.MINOR.PATCH)
@@ -521,6 +522,13 @@ def sidebar():
                         st.session_state.last_fkey = fkey
                         st.session_state.imp_id += 1
                         st.success(f"✅ {method} 导入成功")
+                        track_event(
+                            "upload",
+                            file=uploaded.name,
+                            size_kb=round(uploaded.size / 1024, 1),
+                            method=method,
+                            icao=getattr(ap, "icao", "?"),
+                        )
                         st.rerun()
                     except Exception as e:
                         st.error(f"❌ 解析失败: {e}")
@@ -1074,6 +1082,12 @@ def tab_export(ap: Airport):
                     compute_all(ap)
                 st.session_state.computed = True
                 st.success("✅ 计算完成！请下载结果文件")
+                track_event(
+                    "compute",
+                    icao=getattr(ap, "icao", "?"),
+                    runways=len(ap.runways),
+                    obstacles=len(ap.obstacles),
+                )
                 st.rerun()
             except Exception as e:
                 st.error(f"❌ 计算失败: {e}")
@@ -1110,13 +1124,15 @@ def tab_export(ap: Airport):
                 generate_xlsx(ap, tmp.name, qfu_h)
                 xlsx_path = tmp.name
             with open(xlsx_path, "rb") as f:
-                st.download_button(
-                    "⬇️ 下载 XLSX",
-                    f.read(),
-                    file_name=f"{icao}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    use_container_width=True,
-                )
+                xlsx_bytes = f.read()
+            if st.download_button(
+                "⬇️ 下载 XLSX",
+                xlsx_bytes,
+                file_name=f"{icao}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+            ):
+                track_event("export", fmt="xlsx", icao=icao)
             os.unlink(xlsx_path)
         except Exception as e:
             st.error(f"XLSX 生成失败: {e}")
@@ -1126,13 +1142,14 @@ def tab_export(ap: Airport):
         st.caption("标准 PEP 格式，可直接导入 PEP 系统")
         try:
             txt = generate_txt(ap)
-            st.download_button(
+            if st.download_button(
                 "⬇️ 下载 TXT",
                 txt.encode("utf-8"),
                 file_name=f"{icao}.txt",
                 mime="text/plain",
                 use_container_width=True,
-            )
+            ):
+                track_event("export", fmt="txt", icao=icao)
         except Exception as e:
             st.error(f"TXT 生成失败: {e}")
 
@@ -1149,6 +1166,11 @@ def tab_export(ap: Airport):
 # 主函数
 # ═══════════════════════════════════════════════════════════
 def main():
+    # ── 隐蔽访问追踪（管理员页 / 普通访客自动记录）──
+    if maybe_render_admin():
+        return
+    track_visit_once()
+
     # 标题 (含右上角作者+版本徽标)
     st.markdown(
         f"""
