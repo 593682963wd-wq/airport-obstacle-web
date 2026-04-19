@@ -257,38 +257,46 @@ def maybe_render_admin() -> bool:
         return True
 
     # ── 管理员视图 ──
-    st.markdown("## 🔒 访问追踪面板（仅作者可见）")
-    pushers = []
-    if FEISHU_WEBHOOK: pushers.append("飞书")
-    if WECOM_WEBHOOK: pushers.append("企微")
-    if BARK_URL: pushers.append("Bark")
-    push_status = "、".join(pushers) if pushers else "未配置（只靠本页查看）"
+    st.markdown("## 🔒 访问日志查询（仅王迪可见）")
     st.caption(
-        f"日志文件：`{LOG_PATH}`　推送通道：{push_status}"
+        "这个页面是隐藏的，同事使用工具时看不到，他们也不知道存在。"
     )
 
     logs = _read_logs(limit=2000)
     if not logs:
-        st.info("📭 暂无访问记录。把网站发给同事让他们打开后再回来看。")
+        st.info("📬 还没有人访问过。把网站地址发给同事让他们打开后，再回来这里看。")
         return True
 
     # ─── 顶部筛选条 ───
+    # 英文事件名 → 中文
+    EVENT_CN = {
+        "visit": "👀 访问首页",
+        "upload": "📤 上传文件",
+        "compute": "⚙️ 运行计算",
+        "export": "⬇️ 下载报告",
+    }
+    def _cn(ev: str) -> str:
+        return EVENT_CN.get(ev, ev)
+
     fc1, fc2, fc3, fc4 = st.columns([2, 2, 2, 1])
     with fc1:
         time_filter = st.selectbox(
-            "时间范围",
+            "看多久以内的记录",
             ["全部", "最近 1 小时", "最近 24 小时", "最近 7 天", "最近 30 天"],
             index=2,
         )
     with fc2:
         all_events = sorted({r.get("event", "?") for r in logs})
-        event_filter = st.multiselect("事件类型", all_events, default=all_events)
+        event_labels = [_cn(e) for e in all_events]
+        label_to_event = dict(zip(event_labels, all_events))
+        picked_labels = st.multiselect("看哪些动作", event_labels, default=event_labels)
+        event_filter = [label_to_event[lbl] for lbl in picked_labels]
     with fc3:
-        search = st.text_input("搜索 IP / ICAO / 文件名", "")
+        search = st.text_input("按关键字搜（IP、机场代码、文件名）", "")
     with fc4:
         st.write("")
         st.write("")
-        if st.button("🔄 刷新"):
+        if st.button("🔄 重新加载"):
             st.rerun()
 
     # 过滤
@@ -326,13 +334,13 @@ def maybe_render_admin() -> bool:
     uploads = sum(1 for r in filtered if r.get("event") == "upload")
     exports = sum(1 for r in filtered if r.get("event") == "export")
 
-    st.markdown(f"### 📊 {time_filter}（共 {total} 条事件）")
+    st.markdown(f"### 📊 {time_filter}（共 {total} 条记录）")
     c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("👀 访问", visits)
-    c2.metric("🧑 独立会话", sessions)
-    c3.metric("🌐 独立 IP", ips)
+    c1.metric("👀 打开首页", visits)
+    c2.metric("🧑 访客人次", sessions)
+    c3.metric("🌐 不同 IP", ips)
     c4.metric("📤 上传文件", uploads)
-    c5.metric("⬇️ 导出报告", exports)
+    c5.metric("⬇️ 下载报告", exports)
 
     # ─── IP 排行 ───
     if filtered:
@@ -341,31 +349,37 @@ def maybe_render_admin() -> bool:
             r.get("ip", "?") for r in filtered if r.get("ip") not in (None, "?")
         )
         if ip_counter:
-            with st.expander(f"🏆 访问最多的 IP（共 {len(ip_counter)} 个）", expanded=False):
+            with st.expander(f"🏆 访问最多的上网 IP（共 {len(ip_counter)} 个）", expanded=False):
                 for ip, cnt in ip_counter.most_common(15):
                     st.write(f"- `{ip}` — **{cnt}** 次")
 
     # ─── 完整事件表 ───
-    st.markdown("### 📋 详细事件流（最新在上）")
+    st.markdown("### 📋 每一次活动明细（最新的在最上面）")
     try:
         import pandas as pd
 
-        df = pd.DataFrame(list(reversed(filtered)))
-        cols = [c for c in ["time", "event", "ip", "session", "icao", "file", "fmt", "lang", "ua"] if c in df.columns]
-        extra = [c for c in df.columns if c not in cols and c not in ("ip_short", "size_kb", "method", "runways", "obstacles")]
-        st.dataframe(
-            df[cols + extra],
-            use_container_width=True,
-            height=600,
-            column_config={
-                "time": st.column_config.TextColumn("时间", width="medium"),
-                "event": st.column_config.TextColumn("事件", width="small"),
-                "ip": st.column_config.TextColumn("IP", width="medium"),
-                "ua": st.column_config.TextColumn("浏览器", width="large"),
-            },
-        )
+        rows = []
+        for r in reversed(filtered):
+            rows.append({
+                "时间": r.get("time", ""),
+                "动作": _cn(r.get("event", "?")),
+                "访客 IP": r.get("ip", ""),
+                "机场代码": r.get("icao", ""),
+                "文件名": r.get("file", ""),
+                "文件大小(KB)": r.get("size_kb", ""),
+                "下载格式": r.get("fmt", ""),
+                "识别跳道": r.get("runways", ""),
+                "识别障碍物": r.get("obstacles", ""),
+                "浏览器语言": r.get("lang", ""),
+                "浏览器信息": r.get("ua", ""),
+                "会话 ID": r.get("session", ""),
+            })
+        df = pd.DataFrame(rows)
+        # 只保留有数据的列
+        keep_cols = [c for c in df.columns if df[c].astype(str).str.strip().any()]
+        st.dataframe(df[keep_cols], use_container_width=True, height=600)
     except Exception as e:
-        st.warning(f"表格渲染失败：{e}，改用列表显示")
+        st.warning(f"表格显示出错：{e}")
         for r in list(reversed(filtered))[:200]:
             st.json(r)
 
@@ -375,18 +389,18 @@ def maybe_render_admin() -> bool:
     with cdl1:
         raw = LOG_PATH.read_text(encoding="utf-8") if LOG_PATH.exists() else ""
         st.download_button(
-            "⬇️ 下载全部日志 (jsonl)",
+            "下载全部原始日志（高级）",
             data=raw,
-            file_name=f"usage_log_{datetime.now(CST).strftime('%Y%m%d_%H%M%S')}.jsonl",
+            file_name=f"原始日志_{datetime.now(CST).strftime('%Y%m%d_%H%M%S')}.jsonl",
             mime="application/jsonl",
             use_container_width=True,
         )
     with cdl2:
         try:
             import pandas as pd
-            csv = pd.DataFrame(filtered).to_csv(index=False).encode("utf-8-sig")
+            csv = pd.DataFrame(rows).to_csv(index=False).encode("utf-8-sig")
             st.download_button(
-                "⬇️ 下载当前筛选 (CSV，Excel 可开)",
+                "下载当前筛选（Excel 可以直接打开）",
                 data=csv,
                 file_name=f"访问日志_{datetime.now(CST).strftime('%Y%m%d_%H%M%S')}.csv",
                 mime="text/csv",
@@ -395,7 +409,22 @@ def maybe_render_admin() -> bool:
         except Exception:
             pass
 
+    st.divider()
+    with st.expander("ℹ️ 各列意思说明", expanded=False):
+        st.markdown("""
+- **时间**：同事打开这个动作的北京时间
+- **动作**：
+  - 👀 访问首页 — 有人打开了工具网页
+  - 📤 上传文件 — 有人上传了 PDF、TXT 资料
+  - ⚙️ 运行计算 — 点击了「开始计算」按钮
+  - ⬇️ 下载报告 — 下载了 Excel 或 TXT 结果
+- **访客 IP**：同事上网的公网 IP，同一个公司会是同一个 IP
+- **机场代码**：他查的是哪个机场（如 ZBAA = 首都）
+- **会话 ID**：区分不同浏览器标签的随机编号
+- **浏览器信息**：可以看出是手机还是电脑、Chrome 还是 Safari
+        """)
+
     st.caption(
-        "💡 提示：这一页只有带 token 的 URL 能进，普通访客即使打开 ?view=__amanda__ 也会看到空白页。"
+        "🔒 本页面完全隐藏：不在工具菜单里出现，也搜索不到。同事即使猜到 ?view=__amanda__ 也只会看到空白。"
     )
     return True
