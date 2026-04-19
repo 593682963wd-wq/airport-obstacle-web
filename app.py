@@ -27,7 +27,7 @@ from usage_tracker import track_visit_once, track_event, maybe_render_admin
 #   v1.0.1  ApproachSlope/PEP round-trip 修复
 #   v1.1.0  UI 重构: 步骤卡片, 主按钮高亮, 作者信息, 版本徽标; 移除 PEP TXT 导入入口
 # ══════════════════════════════════════════════════════════════════
-APP_VERSION = "V 1.3.3"
+APP_VERSION = "V 1.3.4"
 AUTHOR = "王迪"
 TECH_SUPPORT = "邵小隆"
 

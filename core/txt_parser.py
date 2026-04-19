@@ -188,7 +188,7 @@ def _parse_ad212(airport: Airport, text: str):
             threshold_elevation=d1['thr_elev'],
             glide_slope=d1['glide_slope'],
             slope=d1['slope'],
-            ga_method_flag=0 if d1['glide_slope'] is not None else 1,
+            ga_method_flag=1,
         )
         rwy.qfus.append(q1)
 
@@ -199,7 +199,7 @@ def _parse_ad212(airport: Airport, text: str):
                     ident=d2['ident'],
                     magnetic_heading=d2['mag'],
                     threshold_elevation=d2['thr_elev'],
-                    ga_method_flag=0 if d2['glide_slope'] is not None else 1,
+                    ga_method_flag=1,
                     glide_slope=d2['glide_slope'],
                     slope=d2['slope'],
                 )

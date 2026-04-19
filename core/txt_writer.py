@@ -79,13 +79,10 @@ def _qfu_block(lines: list[str], qfu: QFU, ap: Airport):
     _field(lines, 3, "TOComments", qfu.to_comments)
     _field(lines, 3, "LDComments", qfu.ld_comments)
     _field(lines, 3, "LastUpdate", qfu.last_update)
-    _field(lines, 3, "GAMethodFlag", qfu.ga_method_flag)
-    _field(lines, 3, "ApproachSlope",
-           qfu.approach_slope if qfu.approach_slope is not None else
-           (APPROACH_SLOPE if qfu.ga_method_flag == 0 else ""))
-    _field(lines, 3, "IncrementGAHeight",
-           qfu.increment_ga_height if qfu.ga_method_flag == 0 and qfu.increment_ga_height is not None else
-           (INCREMENT_GA_HEIGHT if qfu.ga_method_flag == 0 else ""))
+    # GAMethodFlag 固定为 1 (用户业务口径要求, 不论 PDF/PEP/AIP 入口); 同时清空两个只在有 ILS 时有意义的字段
+    _field(lines, 3, "GAMethodFlag", 1)
+    _field(lines, 3, "ApproachSlope", "")
+    _field(lines, 3, "IncrementGAHeight", "")
     _field(lines, 3, "TargetAltitude", "")
     _field(lines, 3, "DecisionAltitude", "")
     _field(lines, 3, "MinGAEOAccelHeight", "")
