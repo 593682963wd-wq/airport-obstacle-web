@@ -47,7 +47,27 @@ ADMIN_TOKEN = _cfg("TRACKER_TOKEN", "amanda2026")
 FEISHU_WEBHOOK = _cfg("TRACKER_FEISHU_WEBHOOK", "")
 WECOM_WEBHOOK = _cfg("TRACKER_WECOM_WEBHOOK", "")  # 企业微信群机器人
 BARK_URL = _cfg("TRACKER_BARK_URL", "")  # 形如 https://api.day.app/<your_key>
-LOG_PATH = Path(_cfg("TRACKER_LOG_PATH", "/tmp/airport_obstacle_usage.jsonl"))
+
+# 日志路径：优先用 ~/.streamlit_data 这种相对持久的路径，回退到 /tmp
+def _default_log_path() -> str:
+    for cand in [
+        os.path.expanduser("~/.streamlit_data/airport_obstacle_usage.jsonl"),
+        "/mount/data/airport_obstacle_usage.jsonl",  # streamlit cloud 持久卷（如果挂了）
+        "/tmp/airport_obstacle_usage.jsonl",
+    ]:
+        try:
+            Path(cand).parent.mkdir(parents=True, exist_ok=True)
+            # 测试可写
+            test = Path(cand).parent / ".write_test"
+            test.write_text("x")
+            test.unlink()
+            return cand
+        except Exception:
+            continue
+    return "/tmp/airport_obstacle_usage.jsonl"
+
+
+LOG_PATH = Path(_cfg("TRACKER_LOG_PATH", _default_log_path()))
 CST = timezone(timedelta(hours=8))
 
 
@@ -247,57 +267,135 @@ def maybe_render_admin() -> bool:
         f"日志文件：`{LOG_PATH}`　推送通道：{push_status}"
     )
 
-    logs = _read_logs(limit=1000)
+    logs = _read_logs(limit=2000)
     if not logs:
-        st.info("暂无访问记录。")
+        st.info("📭 暂无访问记录。把网站发给同事让他们打开后再回来看。")
         return True
 
-    # 统计
-    total = len(logs)
-    visits = sum(1 for r in logs if r.get("event") == "visit")
-    sessions = len({r.get("session") for r in logs})
-    ips = len({r.get("ip") for r in logs if r.get("ip") and r.get("ip") != "?"})
-    uploads = sum(1 for r in logs if r.get("event") == "upload")
-    exports = sum(1 for r in logs if r.get("event") == "export")
+    # ─── 顶部筛选条 ───
+    fc1, fc2, fc3, fc4 = st.columns([2, 2, 2, 1])
+    with fc1:
+        time_filter = st.selectbox(
+            "时间范围",
+            ["全部", "最近 1 小时", "最近 24 小时", "最近 7 天", "最近 30 天"],
+            index=2,
+        )
+    with fc2:
+        all_events = sorted({r.get("event", "?") for r in logs})
+        event_filter = st.multiselect("事件类型", all_events, default=all_events)
+    with fc3:
+        search = st.text_input("搜索 IP / ICAO / 文件名", "")
+    with fc4:
+        st.write("")
+        st.write("")
+        if st.button("🔄 刷新"):
+            st.rerun()
 
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("总事件", total)
-    c2.metric("访问数", visits)
-    c3.metric("独立会话", sessions)
-    c4.metric("独立 IP", ips)
-    c5.metric("导出/上传", f"{exports}/{uploads}")
+    # 过滤
+    now = datetime.now(CST)
+    cutoffs = {
+        "最近 1 小时": now - timedelta(hours=1),
+        "最近 24 小时": now - timedelta(hours=24),
+        "最近 7 天": now - timedelta(days=7),
+        "最近 30 天": now - timedelta(days=30),
+    }
+    cutoff = cutoffs.get(time_filter)
 
-    # 最近 24h
-    cutoff = datetime.now(CST) - timedelta(hours=24)
-    recent24 = []
+    filtered = []
     for r in logs:
-        try:
-            t = datetime.strptime(r["time"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=CST)
-            if t >= cutoff:
-                recent24.append(r)
-        except Exception:
-            pass
-    st.markdown(f"**最近 24 小时事件：{len(recent24)}**")
+        if r.get("event") not in event_filter:
+            continue
+        if cutoff:
+            try:
+                t = datetime.strptime(r["time"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=CST)
+                if t < cutoff:
+                    continue
+            except Exception:
+                pass
+        if search:
+            blob = json.dumps(r, ensure_ascii=False).lower()
+            if search.lower() not in blob:
+                continue
+        filtered.append(r)
 
-    # 完整表格
+    # ─── 顶部统计 ───
+    total = len(filtered)
+    visits = sum(1 for r in filtered if r.get("event") == "visit")
+    sessions = len({r.get("session") for r in filtered})
+    ips = len({r.get("ip") for r in filtered if r.get("ip") and r.get("ip") != "?"})
+    uploads = sum(1 for r in filtered if r.get("event") == "upload")
+    exports = sum(1 for r in filtered if r.get("event") == "export")
+
+    st.markdown(f"### 📊 {time_filter}（共 {total} 条事件）")
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("👀 访问", visits)
+    c2.metric("🧑 独立会话", sessions)
+    c3.metric("🌐 独立 IP", ips)
+    c4.metric("📤 上传文件", uploads)
+    c5.metric("⬇️ 导出报告", exports)
+
+    # ─── IP 排行 ───
+    if filtered:
+        from collections import Counter
+        ip_counter = Counter(
+            r.get("ip", "?") for r in filtered if r.get("ip") not in (None, "?")
+        )
+        if ip_counter:
+            with st.expander(f"🏆 访问最多的 IP（共 {len(ip_counter)} 个）", expanded=False):
+                for ip, cnt in ip_counter.most_common(15):
+                    st.write(f"- `{ip}` — **{cnt}** 次")
+
+    # ─── 完整事件表 ───
+    st.markdown("### 📋 详细事件流（最新在上）")
     try:
         import pandas as pd
 
-        df = pd.DataFrame(reversed(logs))
-        # 列顺序
-        cols = [c for c in ["time", "event", "session", "ip", "lang", "ua"] if c in df.columns]
-        extra = [c for c in df.columns if c not in cols]
-        st.dataframe(df[cols + extra], use_container_width=True, height=600)
-    except Exception:
-        for r in reversed(logs[-200:]):
+        df = pd.DataFrame(list(reversed(filtered)))
+        cols = [c for c in ["time", "event", "ip", "session", "icao", "file", "fmt", "lang", "ua"] if c in df.columns]
+        extra = [c for c in df.columns if c not in cols and c not in ("ip_short", "size_kb", "method", "runways", "obstacles")]
+        st.dataframe(
+            df[cols + extra],
+            use_container_width=True,
+            height=600,
+            column_config={
+                "time": st.column_config.TextColumn("时间", width="medium"),
+                "event": st.column_config.TextColumn("事件", width="small"),
+                "ip": st.column_config.TextColumn("IP", width="medium"),
+                "ua": st.column_config.TextColumn("浏览器", width="large"),
+            },
+        )
+    except Exception as e:
+        st.warning(f"表格渲染失败：{e}，改用列表显示")
+        for r in list(reversed(filtered))[:200]:
             st.json(r)
 
-    # 下载
-    raw = LOG_PATH.read_text(encoding="utf-8") if LOG_PATH.exists() else ""
-    st.download_button(
-        "⬇️ 下载完整日志 (jsonl)",
-        data=raw,
-        file_name=f"usage_log_{datetime.now(CST).strftime('%Y%m%d_%H%M%S')}.jsonl",
-        mime="application/jsonl",
+    # ─── 下载 ───
+    st.markdown("---")
+    cdl1, cdl2 = st.columns(2)
+    with cdl1:
+        raw = LOG_PATH.read_text(encoding="utf-8") if LOG_PATH.exists() else ""
+        st.download_button(
+            "⬇️ 下载全部日志 (jsonl)",
+            data=raw,
+            file_name=f"usage_log_{datetime.now(CST).strftime('%Y%m%d_%H%M%S')}.jsonl",
+            mime="application/jsonl",
+            use_container_width=True,
+        )
+    with cdl2:
+        try:
+            import pandas as pd
+            csv = pd.DataFrame(filtered).to_csv(index=False).encode("utf-8-sig")
+            st.download_button(
+                "⬇️ 下载当前筛选 (CSV，Excel 可开)",
+                data=csv,
+                file_name=f"访问日志_{datetime.now(CST).strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
+        except Exception:
+            pass
+
+    st.caption(
+        "💡 提示：这一页只有带 token 的 URL 能进，普通访客即使打开 ?view=__amanda__ 也会看到空白页。"
     )
     return True
