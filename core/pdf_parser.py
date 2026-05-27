@@ -325,33 +325,71 @@ def _parse_ad213(airport: Airport, tables: list):
         if 'tora' not in cols:
             continue
 
+        # 字段顺序索引(按列位置排序), 用于确定每个字段的列扫描上限
+        ordered = sorted(
+            ((cols[k], k) for k in ('rwy', 'tora', 'toda', 'asda', 'lda', 'remarks') if k in cols),
+            key=lambda x: x[0])
+        next_col = {}
+        for i, (ci, k) in enumerate(ordered):
+            nxt = ordered[i + 1][0] if i + 1 < len(ordered) else None
+            next_col[k] = nxt  # 该字段允许扫描到 [ci, nxt) 的所有单元格
+
+        def _scan_int(row, key):
+            """在 [cols[key], next_col[key]) 区间内查找首个含数字的单元格"""
+            ci = cols.get(key)
+            if ci is None:
+                return 0
+            nxt = next_col.get(key) or len(row)
+            for j in range(ci, min(nxt, len(row))):
+                s = _cs(row[j])
+                m = re.search(r'\d+', s)
+                if m:
+                    return int(m.group())
+            return 0
+
+        def _scan_text(row, key):
+            ci = cols.get(key)
+            if ci is None:
+                return ""
+            nxt = next_col.get(key) or len(row)
+            for j in range(ci, min(nxt, len(row))):
+                s = _cs(row[j])
+                if s:
+                    return s
+            return ""
+
         for row in table:
             rwy_col = cols.get('rwy', 0)
-            rwy_id = _cs(row[rwy_col]) if rwy_col < len(row) else ''
-            # 兼容 pdfplumber 偶发的"整行右移一列"排版(如末尾出现 '22' 在 col1)
-            offset = 0
-            if not re.match(r'\d{2}[LRC]?$', rwy_id):
-                shifted = _cs(row[rwy_col + 1]) if rwy_col + 1 < len(row) else ''
-                if re.match(r'\d{2}[LRC]?$', shifted):
-                    rwy_id = shifted
-                    offset = 1
-                else:
-                    continue
+            # 跑道号: 在 [rwy_col, next) 内扫描首个匹配 NN[LRC]? 的非空单元格
+            rwy_id = ''
+            nxt = next_col.get('rwy') or len(row)
+            for j in range(rwy_col, min(nxt, len(row))):
+                s = _cs(row[j])
+                if re.match(r'\d{2}[LRC]?$', s):
+                    rwy_id = s
+                    break
+            if not rwy_id:
+                continue
 
-            def _col(key):
-                ci = cols.get(key)
-                return None if ci is None else ci + offset
+            tora = _scan_int(row, 'tora')
+            toda = _scan_int(row, 'toda')
+            asda = _scan_int(row, 'asda')
+            # LDA: 单独处理 '-' / '—' 视为 0
+            lda_ci = cols.get('lda')
+            lda = 0
+            if lda_ci is not None:
+                lda_nxt = next_col.get('lda') or len(row)
+                for j in range(lda_ci, min(lda_nxt, len(row))):
+                    s = _cs(row[j])
+                    if s in ('-', '—'):
+                        lda = 0
+                        break
+                    m = re.search(r'\d+', s)
+                    if m:
+                        lda = int(m.group())
+                        break
 
-            tora = _parse_int(row, _col('tora'))
-            toda = _parse_int(row, _col('toda'))
-            asda = _parse_int(row, _col('asda'))
-            lda_ci = _col('lda')
-            lda_cell = _cs(row[lda_ci]) if lda_ci is not None and lda_ci < len(row) else ""
-            lda = _parse_int(row, lda_ci) \
-                if lda_cell not in ('-', '—', '') else 0
-
-            rem_ci = _col('remarks')
-            remarks = _cs(row[rem_ci]) if rem_ci is not None and rem_ci < len(row) else ""
+            remarks = _scan_text(row, 'remarks')
 
             # 交叉起飞点: 备注含"由/从XXX进入"
             is_intersection = '进入' in remarks
