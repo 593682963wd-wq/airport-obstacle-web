@@ -326,18 +326,32 @@ def _parse_ad213(airport: Airport, tables: list):
             continue
 
         for row in table:
-            rwy_id = _cs(row[cols.get('rwy', 0)])
+            rwy_col = cols.get('rwy', 0)
+            rwy_id = _cs(row[rwy_col]) if rwy_col < len(row) else ''
+            # 兼容 pdfplumber 偶发的"整行右移一列"排版(如末尾出现 '22' 在 col1)
+            offset = 0
             if not re.match(r'\d{2}[LRC]?$', rwy_id):
-                continue
+                shifted = _cs(row[rwy_col + 1]) if rwy_col + 1 < len(row) else ''
+                if re.match(r'\d{2}[LRC]?$', shifted):
+                    rwy_id = shifted
+                    offset = 1
+                else:
+                    continue
 
-            tora = _parse_int(row, cols.get('tora'))
-            toda = _parse_int(row, cols.get('toda'))
-            asda = _parse_int(row, cols.get('asda'))
-            lda_cell = _cs(row[cols['lda']]) if 'lda' in cols else ""
-            lda = _parse_int(row, cols.get('lda')) \
+            def _col(key):
+                ci = cols.get(key)
+                return None if ci is None else ci + offset
+
+            tora = _parse_int(row, _col('tora'))
+            toda = _parse_int(row, _col('toda'))
+            asda = _parse_int(row, _col('asda'))
+            lda_ci = _col('lda')
+            lda_cell = _cs(row[lda_ci]) if lda_ci is not None and lda_ci < len(row) else ""
+            lda = _parse_int(row, lda_ci) \
                 if lda_cell not in ('-', '—', '') else 0
 
-            remarks = _cs(row[cols['remarks']]) if 'remarks' in cols else ""
+            rem_ci = _col('remarks')
+            remarks = _cs(row[rem_ci]) if rem_ci is not None and rem_ci < len(row) else ""
 
             # 交叉起飞点: 备注含"由/从XXX进入"
             is_intersection = '进入' in remarks
