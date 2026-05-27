@@ -407,97 +407,239 @@ def _parse_ad213(airport: Airport, tables: list):
 
 # ── AD 2.10 障碍物 ────────────────────────
 
+# 伪标题行关键字(章节标题, 不是真实障碍物数据)
+_AD210_PSEUDO_KW = (
+    '半径', '主要障碍物', '相对', '跑道中心',
+    'within', 'Obstacles within', 'center of',
+)
+# 单元格里的 bearing/distance 子串模式
+_BD_RE = re.compile(r'(\d{1,3})\s*/\s*(\d{2,6})')
+
+
+def _ad210_find_cols(table):
+    """在表前 5 行里定位列索引: name/type/pos/elev/mark/remark"""
+    cols = {'name': -1, 'type': -1, 'pos': -1,
+            'elev': -1, 'mark': -1, 'remark': -1}
+    header_end = -1
+    for ri in range(min(5, len(table))):
+        row = table[ri] or []
+        for ci, cell in enumerate(row):
+            s = _cs(cell)
+            if not s:
+                continue
+            if cols['name'] < 0 and ('Designation' in s
+                                     or ('名称' in s and '编号' in s)
+                                     or '或编号' in s):
+                cols['name'] = ci
+            elif cols['type'] < 0 and (('类型' in s and '障碍' in s)
+                                       or s.strip().startswith('障碍物\n类型')
+                                       or 'Obstacle\ntype' in s):
+                cols['type'] = ci
+            elif cols['pos'] < 0 and ('磁方位' in s or 'BRG' in s.upper()
+                                      or '位置' in s):
+                cols['pos'] = ci
+            elif cols['elev'] < 0 and ('标高' in s or 'Elevation' in s
+                                       or 'ELEV' in s.upper()):
+                cols['elev'] = ci
+            elif cols['mark'] < 0 and ('标志' in s or 'marking' in s.lower()
+                                       or 'Lighting' in s):
+                cols['mark'] = ci
+            elif cols['remark'] < 0 and ('航径' in s or '备注' in s
+                                         or 'Remarks' in s
+                                         or 'take-off' in s.lower()):
+                cols['remark'] = ci
+        if cols['pos'] >= 0 and cols['elev'] >= 0:
+            header_end = ri
+            break
+    if cols['name'] < 0:
+        cols['name'] = 0
+    if cols['type'] < 0 and cols['pos'] > 1:
+        cols['type'] = 1
+    return cols, header_end
+
+
+def _ad210_is_pseudo_row(row, cols):
+    """章节伪标题行: 几乎所有列都空, 唯一文字带'半径...主要障碍物'"""
+    non_empty = [_cs(c) for c in row if _cs(c)]
+    if len(non_empty) > 2:
+        return False
+    blob = ' '.join(non_empty)
+    if not blob:
+        return False
+    return any(kw in blob for kw in _AD210_PSEUDO_KW) and '障碍物' in blob
+
+
+def _ad210_is_header_row(row):
+    """检测表头重复行(跨页时表头会重复出现)"""
+    blob = ' '.join(_cs(c) for c in row)
+    return ('Designation' in blob or 'Obstacle ID' in blob) and '磁方位' in blob
+
+
+def _ad210_is_legend_row(row):
+    """纯数字图例行 '1','2','3'..."""
+    cells = [_cs(c) for c in row if _cs(c)]
+    if not cells:
+        return False
+    return all(re.match(r'^\d{1,2}$', c) for c in cells)
+
+
+def _ad210_finalize(buf, airport):
+    if not buf:
+        return
+    # 提取 bearing/distance: 拼接所有 pos 片段(去掉换行/空格)再正则
+    pos_blob = ' '.join(buf['pos'])
+    m_bd = _BD_RE.search(pos_blob)
+    if not m_bd:
+        return
+    bearing = int(m_bd.group(1))
+    distance = int(m_bd.group(2))
+    if bearing > 360 or distance == 0:
+        return
+
+    # 名称 + 序号: 名称单元格行尾的 1-3 位独立数字 = 序号
+    name_text = '\n'.join(buf['name'])
+    lines = [ln.strip() for ln in name_text.split('\n') if ln.strip()]
+    seq = 0
+    name_parts = []
+    for ln in lines:
+        if re.match(r'^\d{1,3}$', ln):
+            seq = int(ln)
+        else:
+            name_parts.append(ln)
+    name = ''.join(name_parts)
+    if not name:
+        return
+    # 名称里含伪标题关键字 → 丢弃
+    if any(kw in name for kw in _AD210_PSEUDO_KW):
+        return
+
+    # 拼接类型(保持原有 "名称 类型" 风格)
+    type_text = (buf['type'] or '').strip().replace('\n', '')
+    full_name = f"{name}{seq:03d} {type_text}".strip() if seq else (
+        f"{name} {type_text}".strip())
+
+    # 标高: 取 elev 列里第一个数字; 找不到则在 pos blob 中剔除已用 BD 后再扫一遍
+    elev = 0.0
+    elev_blob = ' '.join(buf['elev'])
+    m_el = re.search(r'\d+(?:\.\d+)?', elev_blob)
+    if m_el:
+        elev = float(m_el.group())
+    else:
+        # 兜底: pos 单元格里可能同时含 BD 和标高(上下两行)
+        residual = pos_blob[m_bd.end():]
+        m_el2 = re.search(r'\d+(?:\.\d+)?', residual)
+        if m_el2:
+            elev = float(m_el2.group())
+
+    # 控制/备注: 多行去重
+    seen = []
+    for line in buf['remark']:
+        for ln in str(line).split('\n'):
+            ln = ln.strip()
+            if ln and ln not in seen:
+                seen.append(ln)
+    ctrl = '\n'.join(seen)
+
+    airport.obstacles.append(Obstacle(
+        seq=seq,
+        name=full_name,
+        bearing=bearing,
+        distance=distance,
+        elevation_m=elev,
+        remark_control=ctrl,
+    ))
+
+
 def _parse_ad210(airport: Airport, tables: list):
-    """解析障碍物表(可能跨多页, 每页表头重复)"""
+    """解析 AD 2.10 障碍物表(可能跨多页、跨多张子表)。
+
+    关键点:
+    1) 表头驱动 — 用表头行定位 name/type/pos/elev/mark/remark 列, 避免列错位。
+    2) 多行单元格合并 — 一条障碍物可能跨连续多行(主行 + 续行), 续行靠 name+type 是否为空判断。
+    3) 过滤伪行 — "半径 15 千米内主要障碍物"、"半径 15-50 千米..."、表头重复、数字图例。
+    4) 标高兜底 — 若 elev 列空, 在 pos 单元格剩余文本里找标高(同列上下行排版)。
+    """
     for table in tables:
         if not table or len(table) < 3:
             continue
-        # 放宽列数限制: 允许4-10列(兼容PDF提取的列数差异)
         ncols = len(table[0])
-        if ncols < 4 or ncols > 10:
+        if ncols < 4 or ncols > 12:
             continue
         first_rows = " ".join(
-            _row_text(table[i]) for i in range(min(3, len(table))))
+            _row_text(table[i]) for i in range(min(5, len(table))))
         if '障碍物' not in first_rows:
             continue
         if '磁方位' not in first_rows and 'BRG' not in first_rows.upper():
             continue
 
-        for row in table:
-            if not row or len(row) < 4:
+        cols, header_end = _ad210_find_cols(table)
+        if cols['pos'] < 0 or cols['elev'] < 0:
+            continue
+
+        # pos 涉及的列范围: [pos, elev) — 9 列布局会把 lat/lon/BD 拆成多列
+        pos_range = list(range(cols['pos'], cols['elev']))
+        remark_col = cols['remark'] if cols['remark'] >= 0 else (ncols - 1)
+
+        buf = None  # 当前在构建的障碍物缓冲
+
+        start = max(header_end + 1, 0)
+        for ri in range(start, len(table)):
+            row = table[ri]
+            if not row:
+                continue
+            if _ad210_is_header_row(row):
+                _ad210_finalize(buf, airport)
+                buf = None
+                continue
+            if _ad210_is_pseudo_row(row, cols):
+                _ad210_finalize(buf, airport)
+                buf = None
+                continue
+            if _ad210_is_legend_row(row):
                 continue
 
-            # 动态查找包含 "磁方位/距离" 格式的列 (如 "002/2634")
-            m_pos = None
-            pos_col_idx = -1
-            for ci in range(len(row)):
-                candidate = _cs(row[ci])
-                m = re.search(r'(\d{1,3})\s*/\s*(\d+)', candidate)
-                if m:
-                    m_pos = m
-                    pos_col_idx = ci
-                    break
+            def _get(ci):
+                return _cs(row[ci]) if 0 <= ci < len(row) else ''
 
-            if not m_pos:
-                continue
+            name_cell = _get(cols['name'])
+            type_cell = _get(cols['type']) if cols['type'] >= 0 else ''
 
-            bearing = int(m_pos.group(1))
-            distance = int(m_pos.group(2))
+            # 判定: 有 name 或 type → 新障碍物开始
+            if name_cell or type_cell:
+                _ad210_finalize(buf, airport)
+                buf = {'name': [], 'type': '',
+                       'pos': [], 'elev': [], 'remark': []}
+                if name_cell:
+                    buf['name'].append(name_cell)
+                if type_cell:
+                    buf['type'] = type_cell
+                for ci in pos_range:
+                    v = _get(ci)
+                    if v:
+                        buf['pos'].append(v)
+                ev = _get(cols['elev'])
+                if ev:
+                    buf['elev'].append(ev)
+                rv = _get(remark_col)
+                if rv:
+                    buf['remark'].append(rv)
+            else:
+                # 续行 → 追加到当前 buf
+                if buf is None:
+                    continue
+                for ci in pos_range:
+                    v = _get(ci)
+                    if v:
+                        buf['pos'].append(v)
+                ev = _get(cols['elev'])
+                if ev:
+                    buf['elev'].append(ev)
+                rv = _get(remark_col)
+                if rv:
+                    buf['remark'].append(rv)
+        _ad210_finalize(buf, airport)
 
-            # 名称: 位置列之前所有列合并
-            name_cell = _cs(row[0])
-            if pos_col_idx > 1:
-                name_cell = ' '.join(
-                    _cs(row[c]) for c in range(pos_col_idx) if c < len(row))
-
-            # 序号: 名称单元格末尾独立的1-3位数字行
-            actual_seq = 0
-            cell_lines = name_cell.strip().split('\n')
-            for line in reversed(cell_lines):
-                line = line.strip()
-                if re.match(r'^\d{1,3}$', line):
-                    actual_seq = int(line)
-                    break
-
-            # 回退1: 单独尝试第0列(典型 "序号" 列)
-            if actual_seq == 0 and pos_col_idx > 0:
-                col0_text = _cs(row[0]).strip()
-                m_seq0 = re.match(r'^\s*(\d{1,3})\s*$', col0_text)
-                if m_seq0:
-                    actual_seq = int(m_seq0.group(1))
-
-            # 名称: 去掉末尾序号行, 拼接
-            name_parts = []
-            for line in cell_lines:
-                if re.match(r'^\d{1,3}$', line.strip()):
-                    break
-                name_parts.append(line.strip())
-            name = ''.join(name_parts)
-
-            # 标高(米): 位置列之后的下一列
-            elev = 0.0
-            elev_col = pos_col_idx + 1
-            if elev_col < len(row):
-                elev_cell = _cs(row[elev_col])
-                m_elev = re.search(r'[\d.]+', elev_cell)
-                if m_elev:
-                    elev = float(m_elev.group())
-
-            # 控制障碍物/航段说明: 最后一列(若在标高列之后还有)
-            ctrl = ""
-            if len(row) > elev_col + 1:
-                ctrl = _cs(row[-1])
-
-            obs = Obstacle(
-                seq=actual_seq,
-                name=name,
-                bearing=bearing,
-                distance=distance,
-                elevation_m=elev,
-                remark_control=ctrl,
-            )
-            airport.obstacles.append(obs)
-    # 最终兑底: 任何未识别序号的障碍物按顺序赋 1, 2, 3...
+    # 序号兜底: 没有序号的按顺序赋 1, 2, 3...
     for i, obs in enumerate(airport.obstacles):
         if obs.seq == 0:
             obs.seq = i + 1
