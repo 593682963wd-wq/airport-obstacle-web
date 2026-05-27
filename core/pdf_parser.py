@@ -186,16 +186,16 @@ def _parse_ad212(airport: Airport, tables: list):
             found_data = True
             qfu = QFU(ident=rwy_id)
 
-            # 入口标高 — 优先用ft值(ft*0.3048更精确)
+            # 入口标高 — 优先用PDF原文 m 值, 仅在缺失时由 ft 换算
             if 'thr_elev' in cols:
                 thr_text = _cs(row[cols['thr_elev']])
-                m_ft = re.search(r'THR\s*[\d.]+\s*m\s*/\s*(\d+)\s*ft', thr_text)
-                if m_ft:
-                    qfu.threshold_elevation = round(int(m_ft.group(1)) * FT_TO_M, 4)
+                m_m = re.search(r'THR\s*([\d.]+)\s*m', thr_text)
+                if m_m:
+                    qfu.threshold_elevation = float(m_m.group(1))
                 else:
-                    m_m = re.search(r'THR\s*([\d.]+)\s*m', thr_text)
-                    if m_m:
-                        qfu.threshold_elevation = float(m_m.group(1))
+                    m_ft = re.search(r'(\d+)\s*ft', thr_text)
+                    if m_ft:
+                        qfu.threshold_elevation = round(int(m_ft.group(1)) * FT_TO_M, 4)
                 # ILS: TDZ存在 = 精密进近
                 if 'TDZ' in thr_text:
                     qfu.glide_slope = -3
